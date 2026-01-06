@@ -7,7 +7,7 @@ import { JobProcessor } from './job.processor';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '../../.env',
+      envFilePath: '../.env',
     }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
