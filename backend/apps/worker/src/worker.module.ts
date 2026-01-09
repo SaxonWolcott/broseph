@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
+import { SupabaseModule } from '@app/shared';
 import { JobProcessor } from './job.processor';
+import { GroupsHandler, MessagesHandler, MembersHandler } from './handlers';
 
 @Module({
   imports: [
@@ -21,7 +23,8 @@ import { JobProcessor } from './job.processor';
     BullModule.registerQueue({
       name: 'broseph-jobs',
     }),
+    SupabaseModule,
   ],
-  providers: [JobProcessor],
+  providers: [JobProcessor, GroupsHandler, MessagesHandler, MembersHandler],
 })
 export class WorkerModule {}

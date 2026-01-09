@@ -1,8 +1,13 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { BullModule } from '@nestjs/bullmq';
 import { SupabaseModule } from '@app/shared';
 import { HealthController } from './health.controller';
 import { AuthModule } from './auth/auth.module';
+import { GroupsModule } from './groups/groups.module';
+import { MessagesModule } from './messages/messages.module';
+import { MembersModule } from './members/members.module';
+import { InvitesModule } from './invites/invites.module';
 
 @Module({
   imports: [
@@ -10,8 +15,21 @@ import { AuthModule } from './auth/auth.module';
       isGlobal: true,
       envFilePath: '../.env',
     }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          url: configService.get<string>('REDIS_URL', 'redis://localhost:6379'),
+        },
+      }),
+      inject: [ConfigService],
+    }),
     SupabaseModule,
     AuthModule,
+    GroupsModule,
+    MessagesModule,
+    MembersModule,
+    InvitesModule,
   ],
   controllers: [HealthController],
   providers: [],

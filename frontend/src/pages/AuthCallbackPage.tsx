@@ -19,8 +19,14 @@ export default function AuthCallbackPage() {
       }
 
       if (data.session) {
-        // Successfully authenticated, redirect to home
-        navigate('/', { replace: true });
+        // Check for pending invite from before authentication
+        const pendingInvite = sessionStorage.getItem('pendingInvite');
+        if (pendingInvite) {
+          sessionStorage.removeItem('pendingInvite');
+          navigate(`/invite/${pendingInvite}`, { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
       } else {
         // No session, redirect to sign in
         navigate('/signin', { replace: true });

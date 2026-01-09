@@ -1,0 +1,9 @@
+export const LIMITS = {
+  MAX_MEMBERS_PER_GROUP: 10,
+  MAX_GROUPS_PER_USER: 20,
+  MAX_MESSAGE_LENGTH: 2000,
+  MAX_GROUP_NAME_LENGTH: 50,
+  INVITE_EXPIRY_DAYS: 7,
+} as const;
+
+export type Limits = typeof LIMITS;

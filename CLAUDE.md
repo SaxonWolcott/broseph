@@ -150,6 +150,37 @@ This project includes specialized subagents in `.claude/agents/` for different d
 | `code-reviewer` | Code quality and security review |
 | `task-documenter` | Document completed work in `/tasks/` |
 
+## Task Workflow
+
+When the user says **"Let's start a new task"** or similar at the beginning of a conversation:
+
+1. **Create a task file immediately** by spawning the `task-documenter` agent with:
+   - Task number (next sequential number in `/tasks/`)
+   - Brief description of the task from the user's request
+   - Initial status: "In Progress"
+
+2. **Update the task file throughout the session** as you:
+   - Complete major steps
+   - Make implementation decisions
+   - Encounter and resolve issues
+   - Finish the task
+
+3. **At the end of the task**, ensure the task file includes:
+   - All files created/modified
+   - Key implementation details
+   - Acceptance criteria verification
+   - Lessons learned
+
+**Example:**
+```
+User: "Let's start a new task. I want to add push notifications."
+Assistant: [Spawns task-documenter to create tasks/006-push-notifications.md]
+           [Proceeds with implementation]
+           [Updates task file as work progresses]
+```
+
+The task file serves as documentation for future sessions and helps maintain project history.
+
 ## Gotchas
 
 - Supabase local uses port 54321 (API) and 54323 (Studio)
