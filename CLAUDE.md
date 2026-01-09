@@ -52,9 +52,9 @@ pnpm --filter frontend add <pkg>   # Add to frontend workspace
                     └─────────────┘      └─────────────┘
 ```
 
-- **API App** (`backend/apps/api/`): HTTP API - receives requests, creates jobs, publishes to BullMQ
+- **API App** (`backend/apps/api/`): HTTP API - receives requests, publishes to BullMQ
 - **Worker App** (`backend/apps/worker/`): Processes background jobs from the queue
-- **Shared Libs** (`backend/libs/`): Shared DTOs, schemas, utilities, domain-specific logic
+- **Shared Libs** (`backend/libs/`): Shared DTOs, Zod schemas, utilities
 - **Frontend** (`frontend/`): React + HeroUI for the user interface (mobile-optimized)
 - **Database** (`supabase/`): PostgreSQL via Supabase with migrations
 
@@ -64,7 +64,7 @@ pnpm --filter frontend add <pkg>   # Add to frontend workspace
 |------|---------|
 | `backend/apps/api/` | NestJS HTTP API |
 | `backend/apps/worker/` | BullMQ job processors |
-| `backend/libs/shared/` | DTOs, enums, Zod schemas, utilities |
+| `backend/libs/shared/` | DTOs, Zod schemas, utilities |
 | `frontend/src/` | React app with pages, hooks, components |
 | `supabase/migrations/` | PostgreSQL schema migrations |
 | `tasks/` | Completed task documentation |
@@ -80,16 +80,15 @@ pnpm --filter frontend add <pkg>   # Add to frontend workspace
 ### BullMQ Job Processing
 - Queue name: `broseph-jobs`
 - Jobs published by API, consumed by Worker
-- Job tracker updates database with step progress
 
-### API Authentication
-- API key in `X-API-Key` header
-- Keys stored hashed (SHA-256) in `api_keys` table
-- Tenant context extracted and injected via `@Tenant()` decorator
+### Authentication
+- Supabase Auth with magic link / email OTP
+- JWT tokens validated via Supabase
+- User context via `@CurrentUser()` decorator
 
 ### Database
 - Supabase PostgreSQL with Row Level Security
-- Key tables: `tenants`, `api_keys`, `jobs`, `job_steps`
+- Key tables: `profiles` (linked to auth.users)
 - Never edit DB directly; always use migrations
 
 ## Development Commands
@@ -124,7 +123,7 @@ Required in `.env`:
 
 ## File Naming Conventions
 
-- DTOs: `*.dto.ts` (e.g., `create-job.dto.ts`)
+- DTOs: `*.dto.ts` (e.g., `create-message.dto.ts`)
 - Schemas: `*.schema.ts` (e.g., `message.schema.ts`)
 - Services: `*.service.ts`
 - Controllers: `*.controller.ts`
@@ -153,7 +152,6 @@ This project includes specialized subagents in `.claude/agents/` for different d
 
 ## Gotchas
 
-- BullMQ jobs need explicit IDs for correlation with database records
 - Supabase local uses port 54321 (API) and 54323 (Studio)
 - Use `;` not `&&` to chain PowerShell commands
 - Frontend is mobile-optimized - test on small viewports

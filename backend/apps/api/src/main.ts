@@ -23,7 +23,7 @@ async function bootstrap() {
     .setTitle('Broseph API')
     .setDescription('The Broseph group messaging API')
     .setVersion('0.1.0')
-    .addApiKey({ type: 'apiKey', name: 'X-API-Key', in: 'header' }, 'api-key')
+    .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

@@ -10,7 +10,7 @@ You are a database expert specializing in Supabase migrations and schema design 
 ## Project Context
 
 **Broseph** is a group messaging app with these domain entities:
-- **Users**: App users with profiles
+- **Users/Profiles**: App users with profiles (linked to auth.users)
 - **Groups**: Chat groups with multiple members
 - **Messages**: Individual messages within groups
 - **Prompts**: AI-generated conversation prompts
@@ -31,6 +31,7 @@ broseph/
 │   ├── seed.sql
 │   └── migrations/
 │       ├── 20240101000000_initial_schema.sql
+│       ├── 20240102000000_profiles.sql
 │       └── ...
 ├── backend/
 └── frontend/
@@ -49,7 +50,7 @@ supabase migration new <descriptive-name>
 Example messaging schema migration:
 
 ```sql
--- Migration: 20240102000000_messaging_tables.sql
+-- Migration: 20240103000000_messaging_tables.sql
 -- Description: Creates messaging-related tables
 -- Rollback: DROP TABLE IF EXISTS prompt_responses, prompts, messages, group_members, groups CASCADE;
 
@@ -58,16 +59,14 @@ Example messaging schema migration:
 -- ============================================
 CREATE TABLE IF NOT EXISTS groups (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
     avatar_url TEXT,
-    created_by UUID NOT NULL,
+    created_by UUID NOT NULL REFERENCES profiles(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_groups_tenant_id ON groups(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_groups_created_by ON groups(created_by);
 
 -- ============================================
@@ -76,7 +75,7 @@ CREATE INDEX IF NOT EXISTS idx_groups_created_by ON groups(created_by);
 CREATE TABLE IF NOT EXISTS group_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL,
+    user_id UUID NOT NULL REFERENCES profiles(id),
     role VARCHAR(20) NOT NULL DEFAULT 'member',
     joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     left_at TIMESTAMPTZ,
@@ -96,7 +95,7 @@ CREATE INDEX IF NOT EXISTS idx_group_members_user_id ON group_members(user_id);
 CREATE TABLE IF NOT EXISTS messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    sender_id UUID NOT NULL,
+    sender_id UUID NOT NULL REFERENCES profiles(id),
     content TEXT NOT NULL,
     message_type VARCHAR(50) NOT NULL DEFAULT 'text',
     metadata JSONB DEFAULT '{}',
@@ -135,7 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_prompts_date ON prompts(prompt_date);
 CREATE TABLE IF NOT EXISTS prompt_responses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     prompt_id UUID NOT NULL REFERENCES prompts(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL,
+    user_id UUID NOT NULL REFERENCES profiles(id),
     response TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(prompt_id, user_id)
@@ -183,31 +182,7 @@ supabase migration list
 ```sql
 -- seed.sql
 -- Test data for local development
-
--- Test tenant
-INSERT INTO tenants (id, name)
-VALUES ('10000000-0000-4000-8000-000000000001', 'Development Tenant')
-ON CONFLICT (id) DO NOTHING;
-
--- Test API key
-INSERT INTO api_keys (id, tenant_id, key_hash, name)
-VALUES (
-    '20000000-0000-4000-8000-000000000001',
-    '10000000-0000-4000-8000-000000000001',
-    '7c6a180b36896a65c3b4ab77f51b7e02f0c0a1f7f7d8f8e9e8f7f6f5f4f3f2f1',
-    'Development API Key'
-)
-ON CONFLICT (id) DO NOTHING;
-
--- Test group
-INSERT INTO groups (id, tenant_id, name, created_by)
-VALUES (
-    '30000000-0000-4000-8000-000000000001',
-    '10000000-0000-4000-8000-000000000001',
-    'Test Group',
-    '40000000-0000-4000-8000-000000000001'
-)
-ON CONFLICT (id) DO NOTHING;
+-- Add seed data here as needed
 ```
 
 ## UUID v4 Format
@@ -215,8 +190,8 @@ ON CONFLICT (id) DO NOTHING;
 ```sql
 -- Valid UUID v4: XXXXXXXX-XXXX-4XXX-YXXX-XXXXXXXXXXXX
 --                                ^    ^
---                                |    └─ Y must be 8, 9, a, or b
---                                └────── Must be 4
+--                                |    L─ Y must be 8, 9, a, or b
+--                                L────── Must be 4
 
 '10000000-0000-4000-8000-000000000001'  -- Valid
 '10000000-0000-0000-0000-000000000001'  -- INVALID
@@ -234,7 +209,7 @@ ON CONFLICT (id) DO NOTHING;
 - [ ] Added updated_at trigger where needed
 - [ ] Added table comments
 - [ ] Tested with `supabase db reset`
-- [ ] Updated seed.sql with test data
+- [ ] Updated seed.sql with test data if needed
 
 ## Supabase Commands
 
@@ -260,13 +235,13 @@ ALTER PUBLICATION supabase_realtime ADD TABLE messages;
 
 ## Red Flags to Avoid
 
-❌ Manual database edits
-❌ Non-idempotent migrations
-❌ Missing foreign keys
-❌ Missing indexes on FKs
-❌ Using TIMESTAMP instead of TIMESTAMPTZ
-❌ Invalid UUID v4 format in seeds
-❌ Forgetting to enable realtime for live data
+- Manual database edits
+- Non-idempotent migrations
+- Missing foreign keys
+- Missing indexes on FKs
+- Using TIMESTAMP instead of TIMESTAMPTZ
+- Invalid UUID v4 format in seeds
+- Forgetting to enable realtime for live data
 
 ## Scope Boundaries
 

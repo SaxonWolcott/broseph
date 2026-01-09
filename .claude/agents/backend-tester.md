@@ -13,7 +13,7 @@ You are a backend testing specialist for the Broseph NestJS application. Your pr
 - NestJS HTTP API for REST endpoints
 - BullMQ worker for background jobs
 - Supabase (PostgreSQL) for data persistence
-- Multi-tenant architecture with API key auth
+- Supabase Auth (JWT) for authentication
 
 ## Core Principles
 
@@ -73,11 +73,11 @@ describe('GroupsService', () => {
   describe('findOne', () => {
     it('should return a group when found', async () => {
       // Arrange
-      const mockGroup = { id: '123', name: 'Test Group', tenant_id: 'tenant-1' };
+      const mockGroup = { id: '123', name: 'Test Group' };
       mockSupabase.single.mockResolvedValue({ data: mockGroup, error: null });
 
       // Act
-      const result = await service.findOne('123', 'tenant-1');
+      const result = await service.findOne('123', 'user-1');
 
       // Assert
       expect(result).toEqual(mockGroup);
@@ -89,7 +89,7 @@ describe('GroupsService', () => {
       mockSupabase.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
 
       // Act & Assert
-      await expect(service.findOne('999', 'tenant-1'))
+      await expect(service.findOne('999', 'user-1'))
         .rejects
         .toThrow(NotFoundException);
     });
@@ -103,7 +103,7 @@ describe('GroupsService', () => {
       mockSupabase.single.mockResolvedValue({ data: mockGroup, error: null });
 
       // Act
-      const result = await service.create(createDto, 'tenant-1');
+      const result = await service.create(createDto, 'user-1');
 
       // Assert
       expect(result.id).toBe('123');
@@ -149,17 +149,17 @@ describe('GroupsController', () => {
     it('should create a group', async () => {
       // Arrange
       const createDto: CreateGroupDto = { name: 'Test Group', memberIds: [] };
-      const tenant = { id: 'tenant-1', name: 'Test Tenant' };
+      const user = { id: 'user-1', email: 'test@example.com' };
       const expectedResult = { id: '123', name: 'Test Group' };
 
       jest.spyOn(service, 'create').mockResolvedValue(expectedResult);
 
       // Act
-      const result = await controller.create(createDto, tenant);
+      const result = await controller.create(createDto, user);
 
       // Assert
       expect(result).toEqual(expectedResult);
-      expect(service.create).toHaveBeenCalledWith(createDto, 'tenant-1');
+      expect(service.create).toHaveBeenCalledWith(createDto, 'user-1');
     });
   });
 });
@@ -176,7 +176,7 @@ import { AppModule } from '../src/app.module';
 
 describe('Groups API (e2e)', () => {
   let app: INestApplication;
-  const API_KEY = 'test-api-key';
+  const AUTH_TOKEN = 'test-jwt-token';
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -196,7 +196,7 @@ describe('Groups API (e2e)', () => {
     it('should create a group', () => {
       return request(app.getHttpServer())
         .post('/v1/groups')
-        .set('X-API-Key', API_KEY)
+        .set('Authorization', `Bearer ${AUTH_TOKEN}`)
         .send({ name: 'Test Group', memberIds: [] })
         .expect(201)
         .expect((res) => {
@@ -205,7 +205,7 @@ describe('Groups API (e2e)', () => {
         });
     });
 
-    it('should return 401 without API key', () => {
+    it('should return 401 without auth token', () => {
       return request(app.getHttpServer())
         .post('/v1/groups')
         .send({ name: 'Test Group' })
@@ -217,7 +217,7 @@ describe('Groups API (e2e)', () => {
     it('should return messages for a group', async () => {
       return request(app.getHttpServer())
         .get('/v1/groups/123/messages')
-        .set('X-API-Key', API_KEY)
+        .set('Authorization', `Bearer ${AUTH_TOKEN}`)
         .expect(200)
         .expect((res) => {
           expect(Array.isArray(res.body.data)).toBe(true);
@@ -280,11 +280,11 @@ module.exports = {
 
 ## Red Flags to Avoid
 
-❌ Testing implementation details
-❌ Tests that depend on other tests
-❌ No error case testing
-❌ Hardcoded test data
-❌ Missing mock cleanup
+- Testing implementation details
+- Tests that depend on other tests
+- No error case testing
+- Hardcoded test data
+- Missing mock cleanup
 
 ## Scope Boundaries
 

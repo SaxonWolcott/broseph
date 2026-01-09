@@ -43,16 +43,22 @@ frontend/src/
 
 ```typescript
 // hooks/api.ts
-const API_BASE = '/api/v1';
+import { supabase } from '../lib/supabase';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
 async function fetchApi<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+
   const response = await fetch(`${API_BASE}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
-      'X-API-Key': localStorage.getItem('apiKey') || '',
+      ...(session?.access_token && {
+        'Authorization': `Bearer ${session.access_token}`,
+      }),
       ...options?.headers,
     },
     ...options,
@@ -146,7 +152,7 @@ export function useSendMessage(groupId: string) {
         const optimisticMessage: Message = {
           id: `temp-${Date.now()}`,
           content: newMessage.content,
-          sender: { id: newMessage.senderId, name: 'You' },
+          sender: { id: 'current-user', name: 'You' },
           createdAt: new Date().toISOString(),
           pending: true,
         };
@@ -326,13 +332,13 @@ function App() {
 
 ## Red Flags to Avoid
 
-❌ String query keys (use arrays)
-❌ Missing query invalidation after mutations
-❌ Ignoring error states
-❌ Ignoring loading states
-❌ Manual refetching instead of invalidation
-❌ Storing server state in useState
-❌ Not handling optimistic update rollbacks
+- String query keys (use arrays)
+- Missing query invalidation after mutations
+- Ignoring error states
+- Ignoring loading states
+- Manual refetching instead of invalidation
+- Storing server state in useState
+- Not handling optimistic update rollbacks
 
 ## Scope Boundaries
 

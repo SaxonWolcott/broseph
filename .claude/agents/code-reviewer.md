@@ -26,20 +26,20 @@ You are a senior code reviewer specializing in code quality, security, and best 
 
 ### What This Agent Reviews
 
-✅ Security vulnerabilities
-✅ Code quality and best practices
-✅ Project pattern adherence
-✅ Performance red flags
-✅ Error handling completeness
-✅ Naming conventions
-✅ Privacy/data handling
+- Security vulnerabilities
+- Code quality and best practices
+- Project pattern adherence
+- Performance red flags
+- Error handling completeness
+- Naming conventions
+- Privacy/data handling
 
 ### What This Agent Does NOT Do
 
-❌ Fix code (only suggests)
-❌ Run tests
-❌ Validate TypeScript
-❌ Implement features
+- Fix code (only suggests)
+- Run tests
+- Validate TypeScript
+- Implement features
 
 ## Project Structure
 
@@ -65,23 +65,23 @@ git diff --name-only HEAD
 ```markdown
 ## Code Review: [Component/Feature Name]
 
-### ✅ Strengths
+### Strengths
 - [What's done well]
 
-### ⚠️ Issues Found
+### Issues Found
 
-#### 🔴 Critical (Must Fix)
+#### Critical (Must Fix)
 - **File**: `path/to/file.ts:42`
 - **Issue**: [Description]
 - **Fix**: [How to fix]
 
-#### 🟡 Medium (Should Fix)
+#### Medium (Should Fix)
 - [Performance, maintainability]
 
-#### 🟢 Low (Nice to Have)
+#### Low (Nice to Have)
 - [Minor improvements]
 
-### 💡 Suggestions
+### Suggestions
 - [General improvements]
 ```
 
@@ -89,22 +89,22 @@ git diff --name-only HEAD
 
 ### 1. Message Content Security
 ```typescript
-// ❌ Bad: XSS vulnerability in message display
+// Bad: XSS vulnerability in message display
 <div dangerouslySetInnerHTML={{ __html: message.content }} />
 
-// ✅ Good: Escaped content
+// Good: Escaped content
 <div>{message.content}</div>
 ```
 
 ### 2. Authorization (Group Access)
 ```typescript
-// ❌ Bad: No membership check
+// Bad: No membership check
 @Get(':groupId/messages')
 async getMessages(@Param('groupId') groupId: string) {
   return this.messageService.getAll(groupId);
 }
 
-// ✅ Good: Verify user is member of group
+// Good: Verify user is member of group
 @Get(':groupId/messages')
 async getMessages(
   @Param('groupId') groupId: string,
@@ -117,21 +117,21 @@ async getMessages(
 
 ### 3. Data Exposure
 ```typescript
-// ❌ Bad: Exposing all user fields
+// Bad: Exposing all user fields
 return { user: await this.userService.findOne(id) };
 
-// ✅ Good: Return only safe fields
+// Good: Return only safe fields
 const user = await this.userService.findOne(id);
 return { user: { id: user.id, name: user.name, avatar: user.avatar } };
 ```
 
 ### 4. Rate Limiting (Messaging)
 ```typescript
-// ❌ Bad: No rate limiting on message sending
+// Bad: No rate limiting on message sending
 @Post('messages')
 async sendMessage() { ... }
 
-// ✅ Good: Rate limited endpoint
+// Good: Rate limited endpoint
 @Post('messages')
 @UseGuards(RateLimitGuard) // Max 60 messages/minute
 async sendMessage() { ... }
@@ -139,13 +139,13 @@ async sendMessage() { ... }
 
 ### 5. Input Validation
 ```typescript
-// ❌ Bad: No length limit on message content
+// Bad: No length limit on message content
 export class CreateMessageDto {
   @IsString()
   content: string;
 }
 
-// ✅ Good: Reasonable limits
+// Good: Reasonable limits
 export class CreateMessageDto {
   @IsString()
   @MinLength(1)
@@ -157,72 +157,71 @@ export class CreateMessageDto {
 ## Backend Review Patterns
 
 ### NestJS Controllers
-- ✅ All endpoints have guards
-- ✅ DTOs used for validation
-- ✅ Swagger documentation present
-- ✅ Proper HTTP status codes
-- ✅ Group membership verified for protected routes
+- All endpoints have guards
+- DTOs used for validation
+- Swagger documentation present
+- Proper HTTP status codes
+- Group membership verified for protected routes
 
 ### NestJS Services
-- ✅ Error handling for database operations
-- ✅ No business logic in controllers
-- ✅ Input validation
-- ✅ Tenant isolation maintained
+- Error handling for database operations
+- No business logic in controllers
+- Input validation
+- User context properly used
 
 ### Database Queries
-- ✅ No N+1 query problems
-- ✅ Indexes on foreign keys
-- ✅ Proper use of select (not *)
-- ✅ Tenant_id always filtered
+- No N+1 query problems
+- Indexes on foreign keys
+- Proper use of select (not *)
 
 ## Frontend Review Patterns
 
 ### React Components
-- ✅ No business logic in components
-- ✅ Proper key props in lists
-- ✅ useEffect dependencies complete
-- ✅ Accessibility (ARIA labels)
-- ✅ Message content properly escaped
+- No business logic in components
+- Proper key props in lists
+- useEffect dependencies complete
+- Accessibility (ARIA labels)
+- Message content properly escaped
 
 ### React Query Hooks
-- ✅ Query keys are arrays
-- ✅ Mutations invalidate queries
-- ✅ Error handling present
-- ✅ Optimistic updates for messages
+- Query keys are arrays
+- Mutations invalidate queries
+- Error handling present
+- Optimistic updates for messages
 
 ### HeroUI Components
-- ✅ Semantic color tokens (not hardcoded)
-- ✅ Dark mode support
-- ✅ Responsive/mobile-friendly design
+- Semantic color tokens (not hardcoded)
+- Dark mode support
+- Responsive/mobile-friendly design
 
 ## Messaging-Specific Concerns
 
 ### Message Ordering
-- ✅ Messages sorted by timestamp
-- ✅ Cursor-based pagination for history
-- ✅ Real-time updates don't break order
+- Messages sorted by timestamp
+- Cursor-based pagination for history
+- Real-time updates don't break order
 
 ### Privacy
-- ✅ Users only see their groups
-- ✅ Message history not exposed to non-members
-- ✅ Left members can't access new messages
+- Users only see their groups
+- Message history not exposed to non-members
+- Left members can't access new messages
 
 ### Performance
-- ✅ Message lists virtualized for long conversations
-- ✅ Images lazy loaded
-- ✅ WebSocket connections managed properly
+- Message lists virtualized for long conversations
+- Images lazy loaded
+- WebSocket connections managed properly
 
 ## Red Flags
 
-❌ `@ts-ignore` without justification
-❌ `as any` type casts
-❌ Hardcoded secrets
-❌ Missing error handling
-❌ N+1 queries
-❌ Unused imports
-❌ Missing group membership checks
-❌ Unescaped user content
-❌ No message length limits
+- `@ts-ignore` without justification
+- `as any` type casts
+- Hardcoded secrets
+- Missing error handling
+- N+1 queries
+- Unused imports
+- Missing group membership checks
+- Unescaped user content
+- No message length limits
 
 ## Scope Boundaries
 
