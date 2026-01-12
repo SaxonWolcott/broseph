@@ -19,6 +19,31 @@ export default function AuthCallbackPage() {
       }
 
       if (data.session) {
+        // Check for pending display name from sign-up form
+        // Using localStorage (not sessionStorage) so it persists when magic link opens in new tab
+        const pendingDisplayName = localStorage.getItem('pendingDisplayName');
+        if (pendingDisplayName) {
+          localStorage.removeItem('pendingDisplayName');
+          // Save display name to profile
+          try {
+            const response = await fetch('/api/auth/onboard', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${data.session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ displayName: pendingDisplayName }),
+            });
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              console.error('Onboard API error:', response.status, errorData);
+            }
+          } catch (err) {
+            // Non-critical: continue even if onboard fails
+            console.warn('Failed to save display name during onboard:', err);
+          }
+        }
+
         // Check for pending invite from before authentication
         const pendingInvite = sessionStorage.getItem('pendingInvite');
         if (pendingInvite) {

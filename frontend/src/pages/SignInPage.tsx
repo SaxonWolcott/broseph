@@ -6,6 +6,7 @@ import { useMagicLink } from '../hooks/useMagicLink';
 
 export default function SignInPage() {
   const { user, loading } = useAuth();
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const magicLink = useMagicLink();
@@ -17,9 +18,12 @@ export default function SignInPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    if (!email || !displayName.trim()) return;
 
     try {
+      // Store display name for after magic link confirmation
+      // Using localStorage (not sessionStorage) so it persists when magic link opens in new tab
+      localStorage.setItem('pendingDisplayName', displayName.trim());
       await magicLink.mutateAsync({ email });
       setSubmitted(true);
     } catch {
@@ -60,10 +64,21 @@ export default function SignInPage() {
       <Card className="max-w-md w-full">
         <CardHeader className="flex flex-col items-center gap-2 pb-0">
           <h1 className="text-3xl font-bold">Broseph</h1>
-          <p className="text-default-500">Sign in to continue</p>
+          <p className="text-default-500">Sign in or create an account</p>
         </CardHeader>
         <CardBody className="pt-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <Input
+              label="Display Name"
+              placeholder="Your name"
+              value={displayName}
+              onValueChange={setDisplayName}
+              isRequired
+              autoFocus
+              minLength={2}
+              maxLength={100}
+              description="This is how you'll appear to others"
+            />
             <Input
               type="email"
               label="Email"
@@ -71,13 +86,12 @@ export default function SignInPage() {
               value={email}
               onValueChange={setEmail}
               isRequired
-              autoFocus
             />
             <Button
               type="submit"
               color="primary"
               isLoading={magicLink.isPending}
-              isDisabled={!email}
+              isDisabled={!email || !displayName.trim()}
             >
               Send magic link
             </Button>
