@@ -26,11 +26,11 @@ async function createInvite(
 
 interface CreateInviteParams {
   groupId: string;
-  email?: string;
+  email: string;
 }
 
 /**
- * Hook to create an invite link for a group.
+ * Hook to create an invite and send email to the recipient.
  */
 export function useCreateInvite() {
   const { session } = useAuth();
@@ -38,6 +38,6 @@ export function useCreateInvite() {
 
   return useMutation({
     mutationFn: ({ groupId, email }: CreateInviteParams) =>
-      createInvite(accessToken!, groupId, email ? { email } : undefined),
+      createInvite(accessToken!, groupId, { email }),
   });
 }

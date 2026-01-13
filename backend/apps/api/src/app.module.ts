@@ -8,6 +8,7 @@ import { GroupsModule } from './groups/groups.module';
 import { MessagesModule } from './messages/messages.module';
 import { MembersModule } from './members/members.module';
 import { InvitesModule } from './invites/invites.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { InvitesModule } from './invites/invites.module';
       inject: [ConfigService],
     }),
     SupabaseModule,
+    EmailModule,
     AuthModule,
     GroupsModule,
     MessagesModule,

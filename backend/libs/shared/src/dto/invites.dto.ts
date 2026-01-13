@@ -1,16 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsOptional } from 'class-validator';
+import { IsEmail } from 'class-validator';
 
 // Request DTOs
 
 export class CreateInviteDto {
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: 'friend@example.com',
-    description: 'Optional email to send invite to',
+    description: 'Email address to send the invite to',
   })
-  @IsOptional()
   @IsEmail()
-  email?: string;
+  email!: string;
 }
 
 // Response DTOs

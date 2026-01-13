@@ -45,6 +45,12 @@ class AcceptInviteResponseDto {
   groupId!: string;
 }
 
+// Response DTO for magic link
+class MagicLinkSentDto {
+  sent!: boolean;
+  email!: string;
+}
+
 @ApiTags('Invites')
 @Controller('api')
 export class InvitesController {
@@ -139,5 +145,21 @@ export class InvitesController {
     );
 
     return { jobId, status: 'queued', groupId };
+  }
+
+  @Post('invites/:token/send-magic-link')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send magic link to invite email for one-click join' })
+  @ApiResponse({
+    status: 200,
+    description: 'Magic link sent',
+    type: MagicLinkSentDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid invite' })
+  @ApiResponse({ status: 404, description: 'Invite not found' })
+  async sendMagicLinkForInvite(
+    @Param('token') token: string,
+  ): Promise<MagicLinkSentDto> {
+    return this.invitesService.sendMagicLinkForInvite(token);
   }
 }

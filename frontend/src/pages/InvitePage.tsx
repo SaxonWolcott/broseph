@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Card, CardBody, Spinner, Avatar, Chip } from '@heroui/react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { useInvitePreview } from '../hooks/useInvitePreview';
 import { useAcceptInvite } from '../hooks/useAcceptInvite';
+import { useSendInviteMagicLink } from '../hooks/useSendInviteMagicLink';
 
 export default function InvitePage() {
   const { token } = useParams<{ token: string }>();
@@ -11,6 +13,9 @@ export default function InvitePage() {
   const { session, loading: authLoading } = useAuth();
   const { data: invite, isLoading, error } = useInvitePreview(token);
   const acceptInvite = useAcceptInvite();
+  const sendMagicLink = useSendInviteMagicLink();
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [sentToEmail, setSentToEmail] = useState('');
 
   const handleAcceptInvite = async () => {
     if (!token || !invite) return;
@@ -18,15 +23,20 @@ export default function InvitePage() {
       await acceptInvite.mutateAsync(token);
       toast.success(`You've joined ${invite.groupName}!`);
       navigate('/groups', { replace: true });
-    } catch (error) {
+    } catch {
       // Error handled by mutation
     }
   };
 
-  const handleSignIn = () => {
-    // Store the invite token in session storage to redirect after sign in
-    sessionStorage.setItem('pendingInvite', token || '');
-    navigate('/signin');
+  const handleSendMagicLink = async () => {
+    if (!token) return;
+    try {
+      const result = await sendMagicLink.mutateAsync(token);
+      setMagicLinkSent(true);
+      setSentToEmail(result.email);
+    } catch {
+      // Error handled by mutation
+    }
   };
 
   if (isLoading || authLoading) {
@@ -110,21 +120,61 @@ export default function InvitePage() {
             </p>
           )}
 
+          {sendMagicLink.isError && (
+            <p className="text-danger text-sm">
+              {sendMagicLink.error?.message || 'Failed to send sign-in link'}
+            </p>
+          )}
+
           <div className="pt-4">
             {!session ? (
-              <div className="space-y-3">
-                <p className="text-default-500 text-sm">
-                  Sign in to accept this invite
-                </p>
+              canJoin ? (
+                magicLinkSent ? (
+                  <div className="space-y-4 text-center">
+                    <div className="text-4xl">✉️</div>
+                    <p className="text-default-600">
+                      Check your email at <strong>{sentToEmail}</strong>
+                    </p>
+                    <p className="text-sm text-default-500">
+                      Click the link in your email to join {invite.groupName}
+                    </p>
+                    <Button
+                      variant="light"
+                      size="sm"
+                      onPress={() => {
+                        setMagicLinkSent(false);
+                        sendMagicLink.reset();
+                      }}
+                    >
+                      Resend link
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-default-500 text-sm">
+                      A sign-in link was sent to your email. Click it to join!
+                    </p>
+                    <Button
+                      variant="light"
+                      size="lg"
+                      className="w-full"
+                      onPress={handleSendMagicLink}
+                      isLoading={sendMagicLink.isPending}
+                    >
+                      Resend sign-in link
+                    </Button>
+                  </div>
+                )
+              ) : (
                 <Button
-                  color="primary"
+                  variant="flat"
                   size="lg"
                   className="w-full"
-                  onPress={handleSignIn}
+                  onPress={() => navigate('/signin')}
                 >
                   Sign In
                 </Button>
-              </div>
+              )
             ) : canJoin ? (
               <Button
                 color="primary"

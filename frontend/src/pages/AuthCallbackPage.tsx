@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Spinner } from '@heroui/react';
+import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,10 +46,46 @@ export default function AuthCallbackPage() {
           }
         }
 
-        // Check for pending invite from before authentication
-        const pendingInvite = sessionStorage.getItem('pendingInvite');
+        // Check for auto-accept invite from magic link (one-click join flow)
+        const autoAcceptInvite = searchParams.get('autoAcceptInvite');
+        if (autoAcceptInvite) {
+          try {
+            const response = await fetch(
+              `/api/invites/${autoAcceptInvite}/accept`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${data.session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+              },
+            );
+
+            if (response.ok) {
+              toast.success("You've joined the group!");
+              navigate('/groups', { replace: true });
+              return;
+            } else {
+              const errorData = await response.json().catch(() => ({}));
+              console.error('Accept invite error:', response.status, errorData);
+              // Still navigate to groups, but show error
+              toast.error(errorData.message || 'Failed to join group');
+              navigate('/groups', { replace: true });
+              return;
+            }
+          } catch (err) {
+            console.error('Failed to accept invite:', err);
+            toast.error('Failed to join group');
+            navigate('/groups', { replace: true });
+            return;
+          }
+        }
+
+        // Check for pending invite from before authentication (legacy flow)
+        // Using localStorage (not sessionStorage) so it persists when magic link opens in new tab
+        const pendingInvite = localStorage.getItem('pendingInvite');
         if (pendingInvite) {
-          sessionStorage.removeItem('pendingInvite');
+          localStorage.removeItem('pendingInvite');
           navigate(`/invite/${pendingInvite}`, { replace: true });
         } else {
           navigate('/', { replace: true });
@@ -61,7 +99,7 @@ export default function AuthCallbackPage() {
     // Small delay to ensure supabase has processed the URL hash
     const timer = setTimeout(handleCallback, 100);
     return () => clearTimeout(timer);
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   if (error) {
     return (

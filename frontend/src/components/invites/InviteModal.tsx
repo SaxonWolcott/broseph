@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import {
   Modal,
   ModalContent,
@@ -6,7 +6,7 @@ import {
   ModalBody,
   ModalFooter,
   Button,
-  Snippet,
+  Input,
 } from '@heroui/react';
 import { useCreateInvite } from '../../hooks/useCreateInvite';
 
@@ -23,39 +23,33 @@ export function InviteModal({
   groupId,
   groupName,
 }: InviteModalProps) {
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
   const createInvite = useCreateInvite();
 
-  const handleGenerateLink = async () => {
+  const handleSendInvite = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+
     try {
-      const result = await createInvite.mutateAsync({ groupId });
-      const link = `${window.location.origin}/invite/${result.token}`;
-      setInviteLink(link);
-    } catch (error) {
+      await createInvite.mutateAsync({ groupId, email });
+      setSent(true);
+    } catch {
       // Error is handled by the mutation
     }
   };
 
   const handleClose = () => {
-    setInviteLink(null);
+    setEmail('');
+    setSent(false);
     createInvite.reset();
     onClose();
   };
 
-  const handleCopy = async () => {
-    if (inviteLink) {
-      try {
-        await navigator.clipboard.writeText(inviteLink);
-      } catch (error) {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = inviteLink;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      }
-    }
+  const handleSendAnother = () => {
+    setEmail('');
+    setSent(false);
+    createInvite.reset();
   };
 
   return (
@@ -63,46 +57,65 @@ export function InviteModal({
       <ModalContent>
         <ModalHeader>Invite to {groupName}</ModalHeader>
         <ModalBody>
-          {!inviteLink ? (
-            <div className="space-y-4">
+          {!sent ? (
+            <form onSubmit={handleSendInvite} className="space-y-4">
               <p className="text-sm text-default-500">
-                Generate an invite link to share with friends. The link will
-                expire in 7 days.
+                Enter an email address to send an invite. They'll receive a link
+                to join {groupName}.
               </p>
+              <Input
+                type="email"
+                label="Email address"
+                placeholder="friend@example.com"
+                value={email}
+                onValueChange={setEmail}
+                isRequired
+                autoFocus
+              />
               {createInvite.isError && (
                 <p className="text-sm text-danger">
-                  {createInvite.error?.message || 'Failed to create invite'}
+                  {createInvite.error?.message || 'Failed to send invite'}
                 </p>
               )}
-            </div>
+            </form>
           ) : (
-            <div className="space-y-4">
-              <p className="text-sm text-default-500">
-                Share this link with your friends:
+            <div className="space-y-4 text-center py-4">
+              <div className="text-4xl">✉️</div>
+              <p className="text-default-600">
+                Invite sent to <strong>{email}</strong>
               </p>
-              <Snippet
-                symbol=""
-                variant="bordered"
-                className="w-full"
-                onCopy={handleCopy}
-              >
-                {inviteLink}
-              </Snippet>
+              <p className="text-sm text-default-500">
+                They'll receive an email with a link to join {groupName}.
+              </p>
             </div>
           )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={handleClose}>
-            {inviteLink ? 'Done' : 'Cancel'}
-          </Button>
-          {!inviteLink && (
-            <Button
-              color="primary"
-              onPress={handleGenerateLink}
-              isLoading={createInvite.isPending}
-            >
-              Generate Link
-            </Button>
+          {!sent ? (
+            <>
+              <Button variant="light" onPress={handleClose}>
+                Cancel
+              </Button>
+              <Button
+                color="primary"
+                onPress={() =>
+                  handleSendInvite({ preventDefault: () => {} } as FormEvent)
+                }
+                isLoading={createInvite.isPending}
+                isDisabled={!email}
+              >
+                Send Invite
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="light" onPress={handleSendAnother}>
+                Send Another
+              </Button>
+              <Button color="primary" onPress={handleClose}>
+                Done
+              </Button>
+            </>
           )}
         </ModalFooter>
       </ModalContent>

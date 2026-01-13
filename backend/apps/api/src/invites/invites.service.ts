@@ -4,6 +4,7 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   SupabaseService,
   InvitePreviewDto,
@@ -12,10 +13,20 @@ import {
   LIMITS,
 } from '@app/shared';
 import { randomBytes } from 'crypto';
+import { EmailService } from '../email/email.service';
+
+interface SendMagicLinkResult {
+  sent: boolean;
+  email: string;
+}
 
 @Injectable()
 export class InvitesService {
-  constructor(private supabaseService: SupabaseService) {}
+  constructor(
+    private supabaseService: SupabaseService,
+    private emailService: EmailService,
+    private configService: ConfigService,
+  ) {}
 
   /**
    * Validate that user is a member of the group.
@@ -56,12 +67,12 @@ export class InvitesService {
   }
 
   /**
-   * Create a new invite for a group.
+   * Create a new invite for a group and send email.
    */
   async createInvite(
     groupId: string,
     invitedBy: string,
-    email: string | undefined,
+    email: string,
     accessToken: string,
   ): Promise<{ token: string; expiresAt: string }> {
     const userClient = this.supabaseService.getClientForUser(accessToken);
@@ -69,16 +80,75 @@ export class InvitesService {
     const token = this.generateInviteToken();
     const expiresAt = this.getExpiryDate();
 
-    const { data, error } = await userClient.from('group_invites').insert({
-      group_id: groupId,
-      invited_by: invitedBy,
-      invite_token: token,
-      email: email ?? null,
-      expires_at: expiresAt.toISOString(),
-    }).select('invite_token, expires_at').single();
+    // Create the invite record
+    const { data, error } = await userClient
+      .from('group_invites')
+      .insert({
+        group_id: groupId,
+        invited_by: invitedBy,
+        invite_token: token,
+        email: email,
+        expires_at: expiresAt.toISOString(),
+      })
+      .select('invite_token, expires_at')
+      .single();
 
     if (error) {
       throw new BadRequestException('Failed to create invite');
+    }
+
+    // Fetch group name and inviter name for the email
+    const { data: groupData } = await userClient
+      .from('groups')
+      .select('name')
+      .eq('id', groupId)
+      .single();
+
+    const { data: inviterData } = await userClient
+      .from('profiles')
+      .select('display_name')
+      .eq('id', invitedBy)
+      .single();
+
+    const groupName = groupData?.name ?? 'a group';
+    const inviterName = inviterData?.display_name ?? 'Someone';
+
+    // Build redirect URL that includes the invite token for auto-accept
+    const siteUrl = this.configService.get<string>(
+      'SITE_URL',
+      'http://localhost:5173',
+    );
+    const redirectTo = `${siteUrl}/auth/callback?autoAcceptInvite=${token}`;
+
+    // Send magic link via Supabase - this creates account if needed AND authenticates
+    // The user clicks ONE link and is both logged in and joined to the group
+    const adminClient = this.supabaseService.getAdminClient();
+    try {
+      console.log(`Sending magic link invite to ${email} for group "${groupName}"...`);
+      const { error: authError } = await adminClient.auth.signInWithOtp({
+        email: email,
+        options: {
+          emailRedirectTo: redirectTo,
+        },
+      });
+
+      if (authError) {
+        console.error('Failed to send magic link:', authError.message);
+        // Fall back to our custom email if magic link fails
+        const inviteLink = `${siteUrl}/invite/${token}`;
+        await this.emailService.sendInviteEmail({
+          to: email,
+          groupName,
+          inviterName,
+          inviteLink,
+        });
+      } else {
+        console.log(`Magic link invite sent successfully to ${email}`);
+      }
+    } catch (error) {
+      console.error('Failed to send invite:', error);
+      // Don't fail the invite creation if email fails
+      // The invite is still valid, they just won't get the email
     }
 
     return {
@@ -210,5 +280,64 @@ export class InvitesService {
     }
 
     return { groupId: invite.group_id, inviteId: invite.id };
+  }
+
+  /**
+   * Send a magic link to the invite's email for one-click join.
+   * The magic link will redirect to the auth callback with the invite token.
+   */
+  async sendMagicLinkForInvite(token: string): Promise<SendMagicLinkResult> {
+    const adminClient = this.supabaseService.getAdminClient();
+
+    // Get the invite and its email
+    const { data: invite, error } = await adminClient
+      .from('group_invites')
+      .select('id, email, expires_at, used_at')
+      .eq('invite_token', token)
+      .maybeSingle();
+
+    if (error || !invite) {
+      throw new NotFoundException(ERROR_MESSAGES[ErrorCode.INVITE_NOT_FOUND]);
+    }
+
+    if (!invite.email) {
+      throw new BadRequestException('This invite does not have an email address');
+    }
+
+    // Check if expired
+    if (new Date(invite.expires_at) < new Date()) {
+      throw new BadRequestException(ERROR_MESSAGES[ErrorCode.INVITE_EXPIRED]);
+    }
+
+    // Check if already used
+    if (invite.used_at) {
+      throw new BadRequestException(ERROR_MESSAGES[ErrorCode.INVITE_ALREADY_USED]);
+    }
+
+    // Build redirect URL that includes the invite token for auto-accept
+    const siteUrl = this.configService.get<string>(
+      'SITE_URL',
+      'http://localhost:5173',
+    );
+    const redirectTo = `${siteUrl}/auth/callback?autoAcceptInvite=${token}`;
+
+    // Send magic link via Supabase
+    const { error: authError } = await adminClient.auth.signInWithOtp({
+      email: invite.email,
+      options: {
+        emailRedirectTo: redirectTo,
+      },
+    });
+
+    if (authError) {
+      console.error('Failed to send magic link for invite:', authError.message);
+      throw new BadRequestException('Failed to send sign-in link');
+    }
+
+    // Mask the email for privacy (show first 2 chars and domain)
+    const [localPart, domain] = invite.email.split('@');
+    const maskedEmail = `${localPart.slice(0, 2)}***@${domain}`;
+
+    return { sent: true, email: maskedEmail };
   }
 }
