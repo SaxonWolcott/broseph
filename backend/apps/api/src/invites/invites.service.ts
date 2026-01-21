@@ -20,6 +20,10 @@ interface SendMagicLinkResult {
   email: string;
 }
 
+interface CheckAccountResult {
+  hasAccount: boolean;
+}
+
 @Injectable()
 export class InvitesService {
   constructor(
@@ -113,40 +117,26 @@ export class InvitesService {
     const groupName = groupData?.name ?? 'a group';
     const inviterName = inviterData?.display_name ?? 'Someone';
 
-    // Build redirect URL that includes the invite token for auto-accept
+    // Build invite link that goes to the invite preview page
     const siteUrl = this.configService.get<string>(
       'SITE_URL',
       'http://localhost:5173',
     );
-    const redirectTo = `${siteUrl}/auth/callback?autoAcceptInvite=${token}`;
+    const inviteLink = `${siteUrl}/invite/${token}`;
 
-    // Send magic link via Supabase - this creates account if needed AND authenticates
-    // The user clicks ONE link and is both logged in and joined to the group
-    const adminClient = this.supabaseService.getAdminClient();
+    // Send custom invite email with proper branding
+    // The user clicks the link, sees the invite preview, then logs in/signs up to join
     try {
-      console.log(`Sending magic link invite to ${email} for group "${groupName}"...`);
-      const { error: authError } = await adminClient.auth.signInWithOtp({
-        email: email,
-        options: {
-          emailRedirectTo: redirectTo,
-        },
+      console.log(`Sending invite email to ${email} for group "${groupName}"...`);
+      await this.emailService.sendInviteEmail({
+        to: email,
+        groupName,
+        inviterName,
+        inviteLink,
       });
-
-      if (authError) {
-        console.error('Failed to send magic link:', authError.message);
-        // Fall back to our custom email if magic link fails
-        const inviteLink = `${siteUrl}/invite/${token}`;
-        await this.emailService.sendInviteEmail({
-          to: email,
-          groupName,
-          inviterName,
-          inviteLink,
-        });
-      } else {
-        console.log(`Magic link invite sent successfully to ${email}`);
-      }
+      console.log(`Invite email sent successfully to ${email}`);
     } catch (error) {
-      console.error('Failed to send invite:', error);
+      console.error('Failed to send invite email:', error);
       // Don't fail the invite creation if email fails
       // The invite is still valid, they just won't get the email
     }
@@ -283,8 +273,48 @@ export class InvitesService {
   }
 
   /**
+   * Check if the invite's email has an existing account.
+   */
+  async checkInviteAccount(token: string): Promise<CheckAccountResult> {
+    const adminClient = this.supabaseService.getAdminClient();
+
+    // Get the invite and its email
+    const { data: invite, error } = await adminClient
+      .from('group_invites')
+      .select('id, email, expires_at, used_at')
+      .eq('invite_token', token)
+      .maybeSingle();
+
+    if (error || !invite) {
+      throw new NotFoundException(ERROR_MESSAGES[ErrorCode.INVITE_NOT_FOUND]);
+    }
+
+    if (!invite.email) {
+      throw new BadRequestException('This invite does not have an email address');
+    }
+
+    // Check if expired
+    if (new Date(invite.expires_at) < new Date()) {
+      throw new BadRequestException(ERROR_MESSAGES[ErrorCode.INVITE_EXPIRED]);
+    }
+
+    // Check if already used
+    if (invite.used_at) {
+      throw new BadRequestException(ERROR_MESSAGES[ErrorCode.INVITE_ALREADY_USED]);
+    }
+
+    // Check if email has an existing account
+    const { data: users } = await adminClient.auth.admin.listUsers();
+    const hasAccount = users?.users.some(
+      (user) => user.email?.toLowerCase() === invite.email.toLowerCase(),
+    ) ?? false;
+
+    return { hasAccount };
+  }
+
+  /**
    * Send a magic link to the invite's email for one-click join.
-   * The magic link will redirect to the auth callback with the invite token.
+   * Uses Supabase magic link which will redirect to auth callback with invite token.
    */
   async sendMagicLinkForInvite(token: string): Promise<SendMagicLinkResult> {
     const adminClient = this.supabaseService.getAdminClient();
@@ -292,7 +322,7 @@ export class InvitesService {
     // Get the invite and its email
     const { data: invite, error } = await adminClient
       .from('group_invites')
-      .select('id, email, expires_at, used_at')
+      .select('id, email, group_id, expires_at, used_at')
       .eq('invite_token', token)
       .maybeSingle();
 
@@ -321,7 +351,7 @@ export class InvitesService {
     );
     const redirectTo = `${siteUrl}/auth/callback?autoAcceptInvite=${token}`;
 
-    // Send magic link via Supabase
+    // Send magic link via Supabase - this authenticates AND auto-joins via the redirect
     const { error: authError } = await adminClient.auth.signInWithOtp({
       email: invite.email,
       options: {

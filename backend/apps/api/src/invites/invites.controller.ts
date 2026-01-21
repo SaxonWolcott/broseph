@@ -51,6 +51,11 @@ class MagicLinkSentDto {
   email!: string;
 }
 
+// Response DTO for account check
+class CheckAccountDto {
+  hasAccount!: boolean;
+}
+
 @ApiTags('Invites')
 @Controller('api')
 export class InvitesController {
@@ -145,6 +150,21 @@ export class InvitesController {
     );
 
     return { jobId, status: 'queued', groupId };
+  }
+
+  @Get('invites/:token/check-account')
+  @ApiOperation({ summary: 'Check if invite email has an existing account' })
+  @ApiResponse({
+    status: 200,
+    description: 'Account check result',
+    type: CheckAccountDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid invite' })
+  @ApiResponse({ status: 404, description: 'Invite not found' })
+  async checkInviteAccount(
+    @Param('token') token: string,
+  ): Promise<CheckAccountDto> {
+    return this.invitesService.checkInviteAccount(token);
   }
 
   @Post('invites/:token/send-magic-link')

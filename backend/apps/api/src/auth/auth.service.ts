@@ -9,14 +9,17 @@ import {
   ProfileDto,
   MagicLinkRequestDto,
   OnboardDto,
+  CheckEmailResponseDto,
 } from '@app/shared';
 import { User } from '@supabase/supabase-js';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private supabaseService: SupabaseService,
     private configService: ConfigService,
+    private emailService: EmailService,
   ) {}
 
   /**
@@ -56,6 +59,80 @@ export class AuthService {
         'Unable to send magic link. Please try again.',
       );
     }
+  }
+
+  /**
+   * Send a signup magic link with custom email.
+   * Uses Supabase's generateLink to get the magic link URL, then sends our own email.
+   */
+  async sendSignupMagicLink(dto: MagicLinkRequestDto): Promise<void> {
+    const adminClient = this.supabaseService.getAdminClient();
+    const siteUrl = this.configService.get<string>(
+      'SITE_URL',
+      'http://localhost:5173',
+    );
+    const redirectTo = dto.redirectTo || `${siteUrl}/auth/callback`;
+
+    // Validate redirectTo is in allowed list (basic security)
+    const allowedOrigins = [
+      siteUrl,
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+    ];
+    const redirectOrigin = new URL(redirectTo).origin;
+    if (!allowedOrigins.includes(redirectOrigin)) {
+      throw new BadRequestException('Invalid redirect URL');
+    }
+
+    // Generate magic link without sending Supabase's email
+    const { data, error } = await adminClient.auth.admin.generateLink({
+      type: 'magiclink',
+      email: dto.email,
+      options: {
+        redirectTo: redirectTo,
+      },
+    });
+
+    if (error || !data?.properties?.action_link) {
+      console.error('Generate link error:', error?.message);
+      throw new BadRequestException(
+        'Unable to generate signup link. Please try again.',
+      );
+    }
+
+    // Send our custom signup email
+    try {
+      await this.emailService.sendSignupEmail({
+        to: dto.email,
+        magicLink: data.properties.action_link,
+      });
+    } catch (emailError) {
+      console.error('Failed to send signup email:', emailError);
+      throw new BadRequestException(
+        'Unable to send signup email. Please try again.',
+      );
+    }
+  }
+
+  /**
+   * Check if an email address has an existing account.
+   */
+  async checkEmail(email: string): Promise<CheckEmailResponseDto> {
+    const adminClient = this.supabaseService.getAdminClient();
+
+    // Query auth.users via admin API to check if email exists
+    const { data, error } = await adminClient.auth.admin.listUsers();
+
+    if (error) {
+      console.error('Check email error:', error.message);
+      throw new BadRequestException('Unable to check email. Please try again.');
+    }
+
+    const exists = data.users.some(
+      (user) => user.email?.toLowerCase() === email.toLowerCase(),
+    );
+
+    return { exists };
   }
 
   /**

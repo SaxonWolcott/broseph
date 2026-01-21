@@ -1,14 +1,16 @@
 import { useState, FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { Card, CardBody, CardHeader, Input, Button } from '@heroui/react';
 import { useAuth } from '../contexts/AuthContext';
+import { useCheckEmail } from '../hooks/useCheckEmail';
 import { useMagicLink } from '../hooks/useMagicLink';
 
-export default function SignInPage() {
+export default function LoginPage() {
   const { user, loading } = useAuth();
-  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+  const checkEmail = useCheckEmail();
   const magicLink = useMagicLink();
 
   // Redirect if already authenticated
@@ -18,12 +20,20 @@ export default function SignInPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!email || !displayName.trim()) return;
+    if (!email) return;
+
+    setNotFound(false);
 
     try {
-      // Store display name for after magic link confirmation
-      // Using localStorage (not sessionStorage) so it persists when magic link opens in new tab
-      localStorage.setItem('pendingDisplayName', displayName.trim());
+      // First check if email exists
+      const result = await checkEmail.mutateAsync({ email });
+
+      if (!result.exists) {
+        setNotFound(true);
+        return;
+      }
+
+      // Email exists, send magic link
       await magicLink.mutateAsync({ email });
       setSubmitted(true);
     } catch {
@@ -48,7 +58,9 @@ export default function SignInPage() {
               variant="flat"
               onPress={() => {
                 setSubmitted(false);
+                setNotFound(false);
                 magicLink.reset();
+                checkEmail.reset();
               }}
             >
               Use a different email
@@ -59,48 +71,56 @@ export default function SignInPage() {
     );
   }
 
+  const isLoading = checkEmail.isPending || magicLink.isPending;
+  const error = checkEmail.error || magicLink.error;
+
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="max-w-md w-full">
         <CardHeader className="flex flex-col items-center gap-2 pb-0">
           <h1 className="text-3xl font-bold">Broseph</h1>
-          <p className="text-default-500">Sign in or create an account</p>
+          <p className="text-default-500">Welcome back</p>
         </CardHeader>
         <CardBody className="pt-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <Input
-              label="Display Name"
-              placeholder="Your name"
-              value={displayName}
-              onValueChange={setDisplayName}
-              isRequired
-              autoFocus
-              minLength={2}
-              maxLength={100}
-              description="This is how you'll appear to others"
-            />
             <Input
               type="email"
               label="Email"
               placeholder="you@example.com"
               value={email}
-              onValueChange={setEmail}
+              onValueChange={(value) => {
+                setEmail(value);
+                setNotFound(false);
+              }}
               isRequired
+              autoFocus
             />
+            {notFound && (
+              <p className="text-warning text-sm text-center">
+                No account found with this email.{' '}
+                <Link to="/signup" className="text-primary underline">
+                  Sign up instead?
+                </Link>
+              </p>
+            )}
             <Button
               type="submit"
               color="primary"
-              isLoading={magicLink.isPending}
-              isDisabled={!email || !displayName.trim()}
+              isLoading={isLoading}
+              isDisabled={!email}
             >
               Send magic link
             </Button>
-            {magicLink.isError && (
-              <p className="text-danger text-sm text-center">
-                {magicLink.error.message}
-              </p>
+            {error && !notFound && (
+              <p className="text-danger text-sm text-center">{error.message}</p>
             )}
           </form>
+          <p className="text-center text-default-500 text-sm mt-6">
+            Don't have an account?{' '}
+            <Link to="/signup" className="text-primary underline">
+              Sign up
+            </Link>
+          </p>
         </CardBody>
       </Card>
     </div>

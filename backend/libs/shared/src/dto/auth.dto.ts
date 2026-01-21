@@ -73,3 +73,14 @@ export class OnboardDto {
   })
   handle?: string;
 }
+
+export class CheckEmailDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail()
+  email!: string;
+}
+
+export class CheckEmailResponseDto {
+  @ApiProperty({ example: true, description: 'Whether an account exists with this email' })
+  exists!: boolean;
+}

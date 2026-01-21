@@ -3,6 +3,20 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Spinner } from '@heroui/react';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
+import { Profile } from '../types/auth';
+
+async function fetchProfile(accessToken: string): Promise<Profile> {
+  const response = await fetch('/api/auth/me', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch profile');
+  }
+  return response.json();
+}
 
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -49,6 +63,28 @@ export default function AuthCallbackPage() {
         // Check for auto-accept invite from magic link (one-click join flow)
         const autoAcceptInvite = searchParams.get('autoAcceptInvite');
         if (autoAcceptInvite) {
+          // For new users (invited via email), check if they have a display name
+          // If not, redirect them to signup to complete their profile first
+          try {
+            const profile = await fetchProfile(data.session.access_token);
+
+            if (!profile.displayName) {
+              // New user without a display name - redirect to signup to complete profile
+              // Store the invite token so we can auto-accept after they set their name
+              localStorage.setItem('pendingInviteAccept', autoAcceptInvite);
+              navigate('/signup', { replace: true });
+              return;
+            }
+          } catch (err) {
+            // Profile fetch failed - might be a timing issue with profile creation
+            // Store invite and redirect to signup to be safe
+            console.warn('Failed to fetch profile, redirecting to signup:', err);
+            localStorage.setItem('pendingInviteAccept', autoAcceptInvite);
+            navigate('/signup', { replace: true });
+            return;
+          }
+
+          // User has a display name, proceed with accepting the invite
           try {
             const response = await fetch(
               `/api/invites/${autoAcceptInvite}/accept`,
@@ -91,8 +127,8 @@ export default function AuthCallbackPage() {
           navigate('/', { replace: true });
         }
       } else {
-        // No session, redirect to sign in
-        navigate('/signin', { replace: true });
+        // No session, redirect to login
+        navigate('/login', { replace: true });
       }
     };
 
@@ -106,7 +142,7 @@ export default function AuthCallbackPage() {
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="text-center">
           <p className="text-danger mb-4">{error}</p>
-          <a href="/signin" className="text-primary underline">
+          <a href="/login" className="text-primary underline">
             Try again
           </a>
         </div>

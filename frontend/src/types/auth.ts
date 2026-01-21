@@ -22,3 +22,11 @@ export interface OnboardRequest {
   displayName?: string;
   handle?: string;
 }
+
+export interface CheckEmailRequest {
+  email: string;
+}
+
+export interface CheckEmailResponse {
+  exists: boolean;
+}

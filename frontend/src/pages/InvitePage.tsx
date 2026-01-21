@@ -1,48 +1,91 @@
-import { useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Card, CardBody, Spinner, Avatar, Chip } from '@heroui/react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { useInvitePreview } from '../hooks/useInvitePreview';
 import { useAcceptInvite } from '../hooks/useAcceptInvite';
+import { useCheckInviteAccount } from '../hooks/useCheckInviteAccount';
 import { useSendInviteMagicLink } from '../hooks/useSendInviteMagicLink';
 
 export default function InvitePage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const { session, loading: authLoading } = useAuth();
-  const { data: invite, isLoading, error } = useInvitePreview(token);
+  const { data: invite, isLoading: inviteLoading, error } = useInvitePreview(token);
+  const { data: accountCheck, isLoading: accountLoading } = useCheckInviteAccount(token);
   const acceptInvite = useAcceptInvite();
   const sendMagicLink = useSendInviteMagicLink();
+
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [sentToEmail, setSentToEmail] = useState('');
+  const [autoJoining, setAutoJoining] = useState(false);
 
-  const handleAcceptInvite = async () => {
-    if (!token || !invite) return;
-    try {
-      await acceptInvite.mutateAsync(token);
-      toast.success(`You've joined ${invite.groupName}!`);
-      navigate('/groups', { replace: true });
-    } catch {
-      // Error handled by mutation
+  // Track if we've already triggered auto-actions to prevent double execution
+  const autoActionTriggered = useRef(false);
+
+  // Auto-join for authenticated users
+  useEffect(() => {
+    if (authLoading || inviteLoading || !invite || !token) return;
+    if (autoActionTriggered.current) return;
+
+    const canJoin = !invite.isExpired && !invite.isUsed && !invite.isGroupFull;
+
+    if (session && canJoin) {
+      autoActionTriggered.current = true;
+      setAutoJoining(true);
+
+      acceptInvite.mutateAsync(token)
+        .then(() => {
+          toast.success(`You've joined ${invite.groupName}!`);
+          navigate('/groups', { replace: true });
+        })
+        .catch((err) => {
+          setAutoJoining(false);
+          autoActionTriggered.current = false;
+          toast.error(err.message || 'Failed to join group');
+        });
     }
-  };
+  }, [session, authLoading, invite, inviteLoading, token, navigate, acceptInvite]);
 
-  const handleSendMagicLink = async () => {
-    if (!token) return;
-    try {
-      const result = await sendMagicLink.mutateAsync(token);
-      setMagicLinkSent(true);
-      setSentToEmail(result.email);
-    } catch {
-      // Error handled by mutation
+  // Auto-send magic link for existing users, or redirect to signup for new users
+  useEffect(() => {
+    if (authLoading || inviteLoading || accountLoading || !invite || !token || !accountCheck) return;
+    if (session) return; // Already handled above
+    if (autoActionTriggered.current) return;
+
+    const canJoin = !invite.isExpired && !invite.isUsed && !invite.isGroupFull;
+    if (!canJoin) return;
+
+    autoActionTriggered.current = true;
+
+    if (accountCheck.hasAccount) {
+      // Existing user - auto-send magic link
+      sendMagicLink.mutateAsync(token)
+        .then((result) => {
+          setMagicLinkSent(true);
+          setSentToEmail(result.email);
+        })
+        .catch((err) => {
+          autoActionTriggered.current = false;
+          toast.error(err.message || 'Failed to send sign-in link');
+        });
+    } else {
+      // New user - redirect to signup with invite token stored
+      localStorage.setItem('pendingInviteAccept', token);
+      navigate('/signup', { replace: true });
     }
-  };
+  }, [session, authLoading, invite, inviteLoading, accountCheck, accountLoading, token, navigate, sendMagicLink]);
 
-  if (isLoading || authLoading) {
+  const isLoading = inviteLoading || authLoading || accountLoading;
+
+  if (isLoading || autoJoining) {
     return (
       <div className="flex-1 flex items-center justify-center min-h-screen">
-        <Spinner size="lg" />
+        <div className="text-center space-y-4">
+          <Spinner size="lg" />
+          {autoJoining && <p className="text-default-500">Joining group...</p>}
+        </div>
       </div>
     );
   }
@@ -69,6 +112,40 @@ export default function InvitePage() {
 
   const canJoin = !invite.isExpired && !invite.isUsed && !invite.isGroupFull;
 
+  // Show "check your email" message after magic link is sent
+  if (magicLinkSent) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-screen p-4">
+        <Card className="max-w-md w-full">
+          <CardBody className="text-center py-8 space-y-6">
+            <div className="text-6xl">✉️</div>
+            <div>
+              <h1 className="text-2xl font-bold mb-2">Check your email</h1>
+              <p className="text-default-500">
+                We sent a sign-in link to <strong>{sentToEmail}</strong>
+              </p>
+            </div>
+            <p className="text-sm text-default-500">
+              Click the link in your email to sign in and join {invite.groupName}
+            </p>
+            <Button
+              variant="light"
+              size="sm"
+              onPress={() => {
+                setMagicLinkSent(false);
+                autoActionTriggered.current = false;
+                sendMagicLink.reset();
+              }}
+            >
+              Resend link
+            </Button>
+          </CardBody>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show invite preview with status messages
   return (
     <div className="flex-1 flex items-center justify-center min-h-screen p-4">
       <Card className="max-w-md w-full">
@@ -127,65 +204,7 @@ export default function InvitePage() {
           )}
 
           <div className="pt-4">
-            {!session ? (
-              canJoin ? (
-                magicLinkSent ? (
-                  <div className="space-y-4 text-center">
-                    <div className="text-4xl">✉️</div>
-                    <p className="text-default-600">
-                      Check your email at <strong>{sentToEmail}</strong>
-                    </p>
-                    <p className="text-sm text-default-500">
-                      Click the link in your email to join {invite.groupName}
-                    </p>
-                    <Button
-                      variant="light"
-                      size="sm"
-                      onPress={() => {
-                        setMagicLinkSent(false);
-                        sendMagicLink.reset();
-                      }}
-                    >
-                      Resend link
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-default-500 text-sm">
-                      A sign-in link was sent to your email. Click it to join!
-                    </p>
-                    <Button
-                      variant="light"
-                      size="lg"
-                      className="w-full"
-                      onPress={handleSendMagicLink}
-                      isLoading={sendMagicLink.isPending}
-                    >
-                      Resend sign-in link
-                    </Button>
-                  </div>
-                )
-              ) : (
-                <Button
-                  variant="flat"
-                  size="lg"
-                  className="w-full"
-                  onPress={() => navigate('/signin')}
-                >
-                  Sign In
-                </Button>
-              )
-            ) : canJoin ? (
-              <Button
-                color="primary"
-                size="lg"
-                className="w-full"
-                onPress={handleAcceptInvite}
-                isLoading={acceptInvite.isPending}
-              >
-                Join Group
-              </Button>
-            ) : (
+            {!canJoin ? (
               <Button
                 variant="flat"
                 size="lg"
@@ -194,6 +213,13 @@ export default function InvitePage() {
               >
                 Go to Groups
               </Button>
+            ) : (
+              <div className="space-y-3">
+                <Spinner size="sm" />
+                <p className="text-default-500 text-sm">
+                  Processing your invite...
+                </p>
+              </div>
             )}
           </div>
         </CardBody>

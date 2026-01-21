@@ -155,6 +155,35 @@ export class MembersHandler {
       throw new Error('User has reached maximum group limit');
     }
 
+    // Ensure user's profile exists before adding to group
+    // (handles race condition where profile trigger hasn't fired yet)
+    const { data: profile, error: profileError } = await adminClient
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (profileError) {
+      this.logger.warn(`Error checking profile: ${profileError.message}`);
+    }
+
+    if (!profile) {
+      // Profile doesn't exist yet - create it
+      this.logger.log(`Creating missing profile for user ${userId}`);
+      const { error: createProfileError } = await adminClient
+        .from('profiles')
+        .insert({ id: userId })
+        .select()
+        .single();
+
+      if (createProfileError) {
+        // If it's a duplicate key error, the profile was created in the meantime
+        if (!createProfileError.message.includes('duplicate key')) {
+          throw new Error(`Failed to create profile: ${createProfileError.message}`);
+        }
+      }
+    }
+
     // Add user as member
     const { error: joinError } = await adminClient
       .from('group_members')
