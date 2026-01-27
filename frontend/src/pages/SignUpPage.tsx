@@ -1,37 +1,35 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, FormEvent } from 'react';
 import { Navigate, Link, useNavigate } from 'react-router-dom';
-import { Card, CardBody, CardHeader, Input, Button } from '@heroui/react';
+import { Card, CardBody, CardHeader, Input, Button, Spinner } from '@heroui/react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { useCheckEmail } from '../hooks/useCheckEmail';
 import { useSignupMagicLink } from '../hooks/useSignupMagicLink';
-import { useOnboard } from '../hooks/useMe';
+import { useMe, useOnboard } from '../hooks/useMe';
 
 export default function SignUpPage() {
   const navigate = useNavigate();
   const { user, loading, session } = useAuth();
+  const { data: profile, isLoading: meLoading } = useMe();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [alreadyExists, setAlreadyExists] = useState(false);
-  const [isCompletingProfile, setIsCompletingProfile] = useState(false);
   const checkEmail = useCheckEmail();
   const signupMagicLink = useSignupMagicLink();
   const onboard = useOnboard();
 
-  // Check if user is authenticated but needs to complete their profile (invite flow)
-  useEffect(() => {
-    if (!loading && user) {
-      const pendingInviteAccept = localStorage.getItem('pendingInviteAccept');
-      if (pendingInviteAccept) {
-        // User came from invite flow and needs to set their display name
-        setIsCompletingProfile(true);
-      }
-    }
-  }, [loading, user]);
+  // Wait for auth and profile to load before making routing decisions
+  if (loading || (user && meLoading)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
 
-  // For authenticated users without pending invite, redirect to home
-  if (!loading && user && !isCompletingProfile) {
+  // Authenticated user WITH a display name — no reason to be on /signup
+  if (user && profile?.displayName) {
     return <Navigate to="/" replace />;
   }
 
@@ -69,7 +67,7 @@ export default function SignUpPage() {
         }
       }
 
-      navigate('/groups', { replace: true });
+      navigate('/home', { replace: true });
     } catch {
       // Error handled by mutation state
     }
@@ -112,8 +110,8 @@ export default function SignUpPage() {
     }
   };
 
-  // Show "complete your profile" form for invited users
-  if (isCompletingProfile) {
+  // Show "complete your profile" form for authenticated users without a display name
+  if (user && !profile?.displayName) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="max-w-md w-full">
