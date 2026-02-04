@@ -67,7 +67,7 @@ pnpm --filter frontend add <pkg>   # Add to frontend workspace
 | `backend/libs/shared/` | DTOs, Zod schemas, utilities |
 | `frontend/src/` | React app with pages, hooks, components |
 | `supabase/migrations/` | PostgreSQL schema migrations |
-| `tasks/` | Completed task documentation |
+| `milestones/` | Completed milestone documentation |
 | `reference/` | Reference materials |
 
 ## Important Patterns
@@ -148,38 +148,60 @@ This project includes specialized subagents in `.claude/agents/` for different d
 | `backend-tester` | NestJS tests with Jest/Supertest |
 | `typescript-validator` | Type checking across workspaces |
 | `code-reviewer` | Code quality and security review |
-| `task-documenter` | Document completed work in `/tasks/` |
 
-## Task Workflow
+## Plan Mode Workflow
 
-When the user says **"Let's start a new task"** or similar at the beginning of a conversation:
+**Every plan MUST include a task decomposition.** When writing a plan to `~/.claude/plans/`:
 
-1. **Create a task file immediately** by spawning the `task-documenter` agent with:
-   - Task number (next sequential number in `/tasks/`)
-   - Brief description of the task from the user's request
-   - Initial status: "In Progress"
+1. Write the plan overview and approach
+2. **Always include a "## Tasks" section** that breaks down the work into discrete steps
+3. Include "Document as milestone XXX" as the final task (if significant work)
+4. On execution (even after context clear), read the plan and create native tasks from the Tasks section
 
-2. **Update the task file throughout the session** as you:
-   - Complete major steps
-   - Make implementation decisions
-   - Encounter and resolve issues
-   - Finish the task
+### Plan File Format
 
-3. **At the end of the task**, ensure the task file includes:
-   - All files created/modified
-   - Key implementation details
-   - Acceptance criteria verification
-   - Lessons learned
+```markdown
+# Plan: Feature Name
 
-**Example:**
-```
-User: "Let's start a new task. I want to add push notifications."
-Assistant: [Spawns task-documenter to create tasks/006-push-notifications.md]
-           [Proceeds with implementation]
-           [Updates task file as work progresses]
+## Overview
+What we're building and why.
+
+## Approach
+How we'll implement it.
+
+## Tasks
+- [ ] 1. First discrete piece of work
+- [ ] 2. Second piece of work
+- [ ] 3. Third piece of work
+- [ ] 4. Document as milestone XXX (if applicable)
 ```
 
-The task file serves as documentation for future sessions and helps maintain project history.
+### Milestone Documentation
+
+Significant completed work is documented in `/milestones/XXX-name.md` files:
+- Use `/milestone` skill after completing significant work
+- Milestones are lightweight retrospective docs
+- Track progress in `/reference/ROADMAP.md`
+
+**Milestone numbering:**
+- Milestones are numbered sequentially: 001, 002, 003...
+- Check `/milestones/` directory for the highest existing number
+
+**Simplified milestone format:**
+```markdown
+# Milestone XXX: Name
+
+**Completed:** YYYY-MM-DD
+
+## Summary
+2-3 sentences on what was accomplished.
+
+## Key Changes
+- `path/to/file.ts` - what changed
+
+## Decisions
+- Chose X over Y because Z (if significant)
+```
 
 ## Gotchas
 

@@ -2,14 +2,13 @@
 
 High-level tracking of completed and planned work for Broseph - a group messaging app designed to help friends stay in touch.
 
-## Completed Tasks
+## Completed Milestones
 
-- **Task 001: Project Bootstrap** ✅ - Completed
+- **Milestone 001: Project Bootstrap** - Completed
   - Set up pnpm monorepo with NestJS backend and React frontend
   - Configured Supabase database with initial schema
   - Created 11 specialized Claude Code subagents
-  - **Status:** Complete - all services running
-  - See: `/tasks/001-project-bootstrap.md`
+  - See: `/milestones/001-project-bootstrap.md`
 
 ## Upcoming Work
 
@@ -40,4 +39,4 @@ The following features are planned for future development:
 
 ---
 
-*Last updated: 2025-01-06*
+*Last updated: 2026-02-04*
