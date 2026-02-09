@@ -2,5 +2,13 @@
   "attribution": {
     "commit": "",
     "pr": ""
-  }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(printf:*)",
+      "Bash(echo:*)",
+      "Bash(powershell.exe -Command \"Write-Host \"\"\\\\`a\"\"\")"
+    ]
+  },
+  "outputStyle": "Learning"
 }
