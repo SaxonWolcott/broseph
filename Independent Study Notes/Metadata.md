@@ -1,0 +1,1 @@
+Metadata is "data about data." It provides context, description, and info about sets, objects, or files. This can include its creator, creation date, size, and format. It makes data searchable, usable, and organized. Common types include descriptive, structural, and administrative.

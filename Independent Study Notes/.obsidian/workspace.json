@@ -1,0 +1,207 @@
+{
+  "main": {
+    "id": "5e82b3db7212d5b0",
+    "type": "split",
+    "children": [
+      {
+        "id": "b2e2b110de37246d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "76f31469b25379e9",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Relational Databases.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Relational Databases"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "9a9f1c48e5b855a1",
+    "type": "split",
+    "children": [
+      {
+        "id": "48418609f6cf743f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "04a81add1750e160",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "9e1e4618ae5409af",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "Worker",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "d4f9c5a88bcb16c6",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "d2b9fbd694d1b51b",
+    "type": "split",
+    "children": [
+      {
+        "id": "49c363a4daef6d2c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5f386b6efd1d4a7a",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Relational Databases.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for Relational Databases"
+            }
+          },
+          {
+            "id": "14490f564a867664",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Relational Databases.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from Relational Databases"
+            }
+          },
+          {
+            "id": "32f8450da1daf7b6",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "7d594f43acd35863",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "cc30792ec360a6c7",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Relational Databases.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of Relational Databases"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "76f31469b25379e9",
+  "lastOpenFiles": [
+    "Authentication.md",
+    "HTTP.md",
+    "RLS.md",
+    "Relational Databases.md",
+    "Supabase.md",
+    "Node.js.md",
+    "Packages & Package Managers.md",
+    "PostgreSQL.md",
+    "SQL.md",
+    "REST APIs.md",
+    "NestJS.md",
+    "ES Modules System.md",
+    "RLS policies.md",
+    "TypeScript.md",
+    "Metadata.md",
+    "Packages.md",
+    "Package Manager.md",
+    "Welcome.md"
+  ]
+}
