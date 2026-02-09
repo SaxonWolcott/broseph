@@ -72,14 +72,17 @@ export class MessageDto {
   @ApiProperty({ format: 'uuid' })
   groupId!: string;
 
-  @ApiProperty({ type: MessageSenderDto })
-  sender!: MessageSenderDto;
+  @ApiProperty({ type: MessageSenderDto, nullable: true })
+  sender!: MessageSenderDto | null;
 
   @ApiProperty({ example: 'Hello everyone!' })
   content!: string;
 
   @ApiProperty()
   createdAt!: string;
+
+  @ApiPropertyOptional({ default: 'message', example: 'system', enum: ['message', 'system'] })
+  type!: 'message' | 'system';
 }
 
 export class MessageListDto {

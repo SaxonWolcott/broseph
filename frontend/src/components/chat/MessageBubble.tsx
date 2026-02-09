@@ -23,8 +23,8 @@ export function MessageBubble({
     >
       {showAvatar && !isOwn ? (
         <Avatar
-          name={message.sender.displayName?.charAt(0).toUpperCase() || '?'}
-          src={message.sender.avatarUrl || undefined}
+          name={message.sender?.displayName?.charAt(0).toUpperCase() || '?'}
+          src={message.sender?.avatarUrl || undefined}
           size="sm"
           className="flex-shrink-0"
         />
@@ -37,7 +37,7 @@ export function MessageBubble({
       >
         {!isOwn && showAvatar && (
           <span className="text-xs text-default-400 mb-1 ml-1">
-            {message.sender.displayName || message.sender.handle || 'Unknown'}
+            {message.sender?.displayName || message.sender?.handle || 'Unknown'}
           </span>
         )}
 

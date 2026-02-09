@@ -5,8 +5,10 @@ import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import { MainLayout } from './components/navigation';
 
 // Lazy load pages for better performance
+const HomePage = lazy(() => import('./pages/HomePage'));
 const GroupsPage = lazy(() => import('./pages/GroupsPage'));
 const GroupChatPage = lazy(() => import('./pages/GroupChatPage'));
 const InvitePage = lazy(() => import('./pages/InvitePage'));
@@ -31,15 +33,29 @@ function App() {
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/invite/:token" element={<InvitePage />} />
 
-          {/* Protected routes */}
+          {/* Protected routes with bottom tab navigation */}
+          <Route
+            path="/home"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <HomePage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/groups"
             element={
               <ProtectedRoute>
-                <GroupsPage />
+                <MainLayout>
+                  <GroupsPage />
+                </MainLayout>
               </ProtectedRoute>
             }
           />
+
+          {/* Full-screen routes (no tab bar) */}
           <Route
             path="/groups/:id"
             element={
@@ -49,18 +65,18 @@ function App() {
             }
           />
 
-          {/* Redirect root to groups */}
+          {/* Redirect root to home */}
           <Route
             path="/"
             element={
               <ProtectedRoute>
-                <Navigate to="/groups" replace />
+                <Navigate to="/home" replace />
               </ProtectedRoute>
             }
           />
 
-          {/* Catch all - redirect to groups */}
-          <Route path="*" element={<Navigate to="/groups" replace />} />
+          {/* Catch all - redirect to home */}
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </Suspense>
     </main>

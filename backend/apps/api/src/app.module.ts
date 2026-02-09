@@ -8,6 +8,7 @@ import { GroupsModule } from './groups/groups.module';
 import { MessagesModule } from './messages/messages.module';
 import { MembersModule } from './members/members.module';
 import { InvitesModule } from './invites/invites.module';
+import { PromptsModule } from './prompts/prompts.module';
 import { EmailModule } from './email/email.module';
 
 @Module({
@@ -32,6 +33,7 @@ import { EmailModule } from './email/email.module';
     MessagesModule,
     MembersModule,
     InvitesModule,
+    PromptsModule,
   ],
   controllers: [HealthController],
   providers: [],

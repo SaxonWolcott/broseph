@@ -20,6 +20,9 @@ export enum ErrorCode {
   MESSAGE_TOO_LONG = 'MESSAGE_TOO_LONG',
   MESSAGE_EMPTY = 'MESSAGE_EMPTY',
 
+  // Prompt errors
+  PROMPT_ALREADY_ANSWERED = 'PROMPT_ALREADY_ANSWERED',
+
   // Generic errors
   UNAUTHORIZED = 'UNAUTHORIZED',
   FORBIDDEN = 'FORBIDDEN',
@@ -44,6 +47,8 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
 
   [ErrorCode.MESSAGE_TOO_LONG]: 'Message cannot exceed 2000 characters',
   [ErrorCode.MESSAGE_EMPTY]: 'Message cannot be empty',
+
+  [ErrorCode.PROMPT_ALREADY_ANSWERED]: "You've already answered today's prompt for this group",
 
   [ErrorCode.UNAUTHORIZED]: 'Authentication required',
   [ErrorCode.FORBIDDEN]: 'You do not have permission to perform this action',

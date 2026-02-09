@@ -8,9 +8,10 @@ export interface MessageSender {
 export interface Message {
   id: string;
   groupId: string;
-  sender: MessageSender;
+  sender: MessageSender | null;
   content: string;
   createdAt: string;
+  type: 'message' | 'system';
   // For optimistic updates
   pending?: boolean;
   error?: boolean;

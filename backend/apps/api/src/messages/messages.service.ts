@@ -59,6 +59,7 @@ export class MessagesService {
         sender_id,
         content,
         created_at,
+        type,
         sender:sender_id (
           id,
           display_name,
@@ -95,19 +96,23 @@ export class MessagesService {
     const resultMessages = hasMore ? messages.slice(0, limit) : messages || [];
 
     const messageDtos: MessageDto[] = resultMessages.map((m) => {
-      const senderProfile = m.sender as unknown as {
-        id: string;
-        display_name: string | null;
-        handle: string | null;
-        avatar_url: string | null;
-      } | null;
+      let sender: MessageSenderDto | null = null;
 
-      const sender: MessageSenderDto = {
-        id: m.sender_id,
-        displayName: senderProfile?.display_name ?? null,
-        handle: senderProfile?.handle ?? null,
-        avatarUrl: senderProfile?.avatar_url ?? null,
-      };
+      if (m.sender_id) {
+        const senderProfile = m.sender as unknown as {
+          id: string;
+          display_name: string | null;
+          handle: string | null;
+          avatar_url: string | null;
+        } | null;
+
+        sender = {
+          id: m.sender_id,
+          displayName: senderProfile?.display_name ?? null,
+          handle: senderProfile?.handle ?? null,
+          avatarUrl: senderProfile?.avatar_url ?? null,
+        };
+      }
 
       return {
         id: m.id,
@@ -115,6 +120,7 @@ export class MessagesService {
         sender,
         content: m.content,
         createdAt: m.created_at,
+        type: ((m as unknown as { type: string }).type as 'message' | 'system') ?? 'message',
       };
     });
 

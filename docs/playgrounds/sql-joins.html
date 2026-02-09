@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL JOIN Visualizer — Broseph</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #111; color: #e0e0e0; height: 100vh; display: flex; overflow: hidden;
+  }
+  :root { --mono: 'SF Mono','Cascadia Code','Consolas',monospace; --accent: #e5c07b; }
+
+  /* ── Sidebar ── */
+  .controls {
+    width: 320px; min-width: 320px; background: #1a1a1a; border-right: 1px solid #333;
+    display: flex; flex-direction: column;
+  }
+  .controls-header { padding: 20px 20px 0; }
+  .controls h1 { font-size: 18px; font-weight: 700; color: #fff; }
+  .controls h1 span { color: var(--accent); }
+  .controls-scroll { flex:1; overflow-y:auto; padding:16px 20px 20px; display:flex; flex-direction:column; gap:16px; }
+  .group-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.8px; color:#666; margin-bottom:4px; }
+  .control-group { display:flex; flex-direction:column; gap:8px; }
+
+  select {
+    background:#252525; color:#e0e0e0; border:1px solid #3a3a3a; border-radius:6px;
+    padding:8px 10px; font-size:13px; font-family:inherit; cursor:pointer; outline:none; width:100%;
+  }
+  select:focus { border-color: var(--accent); }
+
+  .join-types { display:flex; flex-wrap:wrap; gap:6px; }
+  .join-btn {
+    background:#252525; border:1px solid #3a3a3a; color:#ccc; padding:6px 12px;
+    border-radius:6px; font-size:12px; font-family:var(--mono); cursor:pointer; transition:all 0.15s;
+  }
+  .join-btn:hover { border-color:#555; color:#fff; }
+  .join-btn.active { background:rgba(229,192,123,0.12); border-color:var(--accent); color:var(--accent); }
+
+  .presets { display:flex; flex-wrap:wrap; gap:6px; }
+  .preset-btn {
+    background:#252525; border:1px solid #3a3a3a; color:#ccc; padding:5px 10px;
+    border-radius:5px; font-size:11px; font-family:inherit; cursor:pointer; transition:all 0.15s;
+  }
+  .preset-btn:hover { background:#333; border-color:#555; color:#fff; }
+  .preset-btn.active { background:rgba(229,192,123,0.12); border-color:var(--accent); color:var(--accent); }
+
+  .join-on-display {
+    font-family:var(--mono); font-size:12px; color:#999; background:#222;
+    padding:8px 12px; border-radius:6px; border:1px solid #333; line-height:1.5;
+  }
+  .join-on-display .kw { color:var(--accent); }
+  .join-on-display .tbl { color:#61afef; }
+  .join-on-display .col { color:#98c379; }
+
+  .explanation {
+    font-size:12px; line-height:1.6; color:#999; padding:10px 12px;
+    background:#1e1e2e; border-radius:6px; border:1px solid #333;
+  }
+
+  /* ── Main ── */
+  .main { flex:1; display:flex; flex-direction:column; min-width:0; }
+
+  .preview-area { flex:1; padding:24px; overflow:auto; display:flex; flex-direction:column; gap:20px; }
+
+  .tables-row { display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
+
+  .data-table {
+    border-radius:8px; overflow:hidden; border:1px solid #333; flex:1; min-width:200px;
+  }
+  .data-table.result { flex:2; min-width:360px; }
+  .data-table.left-src { border-color:#61afef55; }
+  .data-table.right-src { border-color:#c678dd55; }
+  .data-table.result { border-color:var(--accent); }
+
+  .table-header {
+    padding:8px 12px; font-size:12px; font-weight:600; display:flex;
+    justify-content:space-between; align-items:center;
+  }
+  .left-src .table-header { background:#61afef18; color:#61afef; }
+  .right-src .table-header { background:#c678dd18; color:#c678dd; }
+  .result .table-header { background:rgba(229,192,123,0.1); color:var(--accent); }
+
+  .table-header .row-count { font-weight:400; opacity:0.6; font-family:var(--mono); font-size:11px; }
+
+  table { width:100%; border-collapse:collapse; }
+  th {
+    text-align:left; padding:6px 10px; font-size:11px; font-weight:600;
+    color:#888; background:#1a1a1a; border-bottom:1px solid #333;
+    font-family:var(--mono); text-transform:lowercase;
+  }
+  td {
+    padding:5px 10px; font-size:12px; font-family:var(--mono);
+    border-bottom:1px solid #222; color:#ccc; transition: all 0.3s;
+  }
+  tr.highlighted td { background:rgba(229,192,123,0.1); }
+  tr.dimmed td { opacity:0.3; }
+  tr.null-row td { color:#e06c75; font-style:italic; }
+  tr.matched td { background:rgba(152,195,121,0.08); }
+
+  .left-src tr.highlighted td { background:rgba(97,175,239,0.12); }
+  .right-src tr.highlighted td { background:rgba(198,120,221,0.12); }
+
+  td.join-col { font-weight:600; }
+  .left-src td.join-col { color:#61afef; }
+  .right-src td.join-col { color:#c678dd; }
+
+  .result-section-label {
+    font-size:13px; font-weight:600; color:#888; display:flex; align-items:center; gap:8px;
+  }
+  .result-section-label::after { content:''; flex:1; height:1px; background:#333; }
+
+  .arrow-label {
+    font-size:24px; color:#444; align-self:center; flex-shrink:0;
+    display:flex; align-items:center; padding-top:28px;
+  }
+
+  /* ── Venn Diagram ── */
+  .venn-container { display:flex; justify-content:center; padding:8px 0; }
+  .venn-svg { width:200px; height:120px; }
+  .venn-svg circle { fill:none; stroke-width:2; }
+  .venn-svg .left-circle { stroke:#61afef; }
+  .venn-svg .right-circle { stroke:#c678dd; }
+  .venn-svg .fill-area { opacity:0.2; }
+
+  /* ── Bottom panel ── */
+  .bottom-panel { border-top:1px solid #333; background:#1a1a1a; display:flex; flex-direction:column; }
+  .tabs { display:flex; border-bottom:1px solid #333; }
+  .tab {
+    padding:8px 16px; font-size:12px; font-weight:500; color:#666;
+    background:none; border:none; cursor:pointer; border-bottom:2px solid transparent;
+    transition:all 0.15s; font-family:inherit;
+  }
+  .tab:hover { color:#999; }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .tab-content { padding:14px 20px; display:none; }
+  .tab-content.active { display:block; }
+  .prompt-text { font-size:13px; line-height:1.6; color:#ccc; }
+  .sql-code {
+    font-family:var(--mono); font-size:13px; line-height:1.7; color:#ccc; white-space:pre;
+  }
+  .sql-code .kw { color:var(--accent); font-weight:600; }
+  .sql-code .tbl { color:#61afef; }
+  .sql-code .col { color:#98c379; }
+  .sql-code .cmt { color:#555; font-style:italic; }
+  .copy-row { display:flex; justify-content:flex-end; margin-top:10px; }
+  .copy-btn {
+    background:var(--accent); color:#111; border:none; border-radius:6px;
+    padding:6px 14px; font-size:12px; font-weight:600; font-family:inherit;
+    cursor:pointer; transition:all 0.15s;
+  }
+  .copy-btn:hover { filter:brightness(1.15); }
+  .copy-btn.copied { background:#98c379; }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <div class="controls-header"><h1><span>SQL JOIN</span> Visualizer</h1></div>
+  <div class="controls-scroll">
+    <div>
+      <div class="group-label">Presets (Broseph Queries)</div>
+      <div class="presets" id="presets"></div>
+    </div>
+    <div class="control-group">
+      <div class="group-label">Left Table</div>
+      <select id="left-table"></select>
+    </div>
+    <div class="control-group">
+      <div class="group-label">Right Table</div>
+      <select id="right-table"></select>
+    </div>
+    <div class="control-group">
+      <div class="group-label">Join Type</div>
+      <div class="join-types" id="join-types"></div>
+      <div class="venn-container"><svg class="venn-svg" id="venn" viewBox="0 0 200 120"></svg></div>
+    </div>
+    <div class="control-group">
+      <div class="group-label">Join Condition</div>
+      <div class="join-on-display" id="join-on"></div>
+    </div>
+    <div class="control-group">
+      <div class="group-label">How It Works</div>
+      <div class="explanation" id="explanation"></div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="preview-area">
+    <div class="tables-row">
+      <div class="data-table left-src" id="left-display"></div>
+      <div class="arrow-label">⋈</div>
+      <div class="data-table right-src" id="right-display"></div>
+    </div>
+    <div class="result-section-label">Result</div>
+    <div class="data-table result" id="result-display"></div>
+  </div>
+
+  <div class="bottom-panel">
+    <div class="tabs">
+      <button class="tab active" data-tab="prompt">Prompt</button>
+      <button class="tab" data-tab="sql">SQL</button>
+    </div>
+    <div class="tab-content active" id="tab-prompt">
+      <div class="prompt-text" id="prompt-output"></div>
+      <div class="copy-row"><button class="copy-btn" id="copy-prompt">Copy Prompt</button></div>
+    </div>
+    <div class="tab-content" id="tab-sql">
+      <div class="sql-code" id="sql-output"></div>
+      <div class="copy-row"><button class="copy-btn" id="copy-sql">Copy SQL</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Broseph sample data ──
+const TABLES = {
+  profiles: {
+    label: 'profiles',
+    cols: ['id', 'display_name'],
+    rows: [
+      { id: 'u1', display_name: 'Alice' },
+      { id: 'u2', display_name: 'Bob' },
+      { id: 'u3', display_name: 'Charlie' },
+      { id: 'u4', display_name: 'Diana' },
+    ],
+  },
+  groups: {
+    label: 'groups',
+    cols: ['id', 'name', 'owner_id'],
+    rows: [
+      { id: 'g1', name: 'College Bros', owner_id: 'u1' },
+      { id: 'g2', name: 'Work Chat', owner_id: 'u2' },
+      { id: 'g3', name: 'Empty Group', owner_id: 'u4' },
+    ],
+  },
+  group_members: {
+    label: 'group_members',
+    cols: ['group_id', 'user_id', 'role'],
+    rows: [
+      { group_id: 'g1', user_id: 'u1', role: 'owner' },
+      { group_id: 'g1', user_id: 'u2', role: 'member' },
+      { group_id: 'g1', user_id: 'u3', role: 'member' },
+      { group_id: 'g2', user_id: 'u2', role: 'owner' },
+      { group_id: 'g2', user_id: 'u1', role: 'member' },
+    ],
+  },
+  messages: {
+    label: 'messages',
+    cols: ['id', 'group_id', 'sender_id', 'content'],
+    rows: [
+      { id: 'm1', group_id: 'g1', sender_id: 'u1', content: 'Hey everyone!' },
+      { id: 'm2', group_id: 'g1', sender_id: 'u2', content: 'Sup!' },
+      { id: 'm3', group_id: 'g2', sender_id: 'u2', content: 'Meeting at 3' },
+      { id: 'm4', group_id: 'g1', sender_id: null, content: 'Bob joined' },
+    ],
+  },
+};
+
+// ── Join key relationships ──
+const JOIN_KEYS = {
+  'profiles|groups':        { left: 'id',       right: 'owner_id' },
+  'profiles|group_members': { left: 'id',       right: 'user_id' },
+  'profiles|messages':      { left: 'id',       right: 'sender_id' },
+  'groups|group_members':   { left: 'id',       right: 'group_id' },
+  'groups|messages':        { left: 'id',       right: 'group_id' },
+  'group_members|messages': { left: 'group_id', right: 'group_id' },
+};
+
+function getJoinKey(left, right) {
+  return JOIN_KEYS[`${left}|${right}`] || JOIN_KEYS[`${right}|${left}`] && { left: JOIN_KEYS[`${right}|${left}`].right, right: JOIN_KEYS[`${right}|${left}`].left } || null;
+}
+
+const JOIN_TYPES = ['INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'FULL OUTER JOIN'];
+const JOIN_EXPLANATIONS = {
+  'INNER JOIN': 'Returns only rows where the join condition matches in <b>both</b> tables. Unmatched rows from either side are excluded.',
+  'LEFT JOIN': 'Returns <b>all rows</b> from the left table, and matched rows from the right. If no match exists, right columns are <b>NULL</b>.',
+  'RIGHT JOIN': 'Returns <b>all rows</b> from the right table, and matched rows from the left. If no match exists, left columns are <b>NULL</b>.',
+  'FULL OUTER JOIN': 'Returns <b>all rows</b> from both tables. Where there\'s no match, the missing side fills with <b>NULL</b>.',
+};
+
+const PRESETS = {
+  'Who owns which group?': { left: 'profiles', right: 'groups', join: 'INNER JOIN' },
+  'All users + their groups': { left: 'profiles', right: 'group_members', join: 'LEFT JOIN' },
+  'Messages + sender names': { left: 'messages', right: 'profiles', join: 'LEFT JOIN' },
+  'Groups + their messages': { left: 'groups', right: 'messages', join: 'LEFT JOIN' },
+  'Members in each group': { left: 'groups', right: 'group_members', join: 'INNER JOIN' },
+};
+
+// ── State ──
+const state = { left: 'profiles', right: 'group_members', join: 'LEFT JOIN' };
+
+// ── Build UI ──
+const tableNames = Object.keys(TABLES);
+
+const elLeft = document.getElementById('left-table');
+const elRight = document.getElementById('right-table');
+tableNames.forEach(t => {
+  elLeft.innerHTML += `<option value="${t}">${t}</option>`;
+  elRight.innerHTML += `<option value="${t}">${t}</option>`;
+});
+elLeft.value = state.left;
+elRight.value = state.right;
+
+const elJoinTypes = document.getElementById('join-types');
+JOIN_TYPES.forEach(jt => {
+  const btn = document.createElement('button');
+  btn.className = 'join-btn';
+  btn.textContent = jt;
+  btn.addEventListener('click', () => { state.join = jt; clearPreset(); updateAll(); });
+  elJoinTypes.appendChild(btn);
+});
+
+const elPresets = document.getElementById('presets');
+Object.entries(PRESETS).forEach(([name, p]) => {
+  const btn = document.createElement('button');
+  btn.className = 'preset-btn';
+  btn.textContent = name;
+  btn.addEventListener('click', () => {
+    state.left = p.left; state.right = p.right; state.join = p.join;
+    elLeft.value = p.left; elRight.value = p.right;
+    clearPreset(); btn.classList.add('active');
+    updateAll();
+  });
+  elPresets.appendChild(btn);
+});
+
+function clearPreset() { elPresets.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active')); }
+
+elLeft.addEventListener('change', () => { state.left = elLeft.value; clearPreset(); updateAll(); });
+elRight.addEventListener('change', () => { state.right = elRight.value; clearPreset(); updateAll(); });
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// Copy
+let promptText = '', sqlText = '';
+function setupCopy(btnId, getFn, label) {
+  const btn = document.getElementById(btnId);
+  btn.addEventListener('click', () => {
+    navigator.clipboard.writeText(getFn()).then(() => {
+      btn.textContent = 'Copied!'; btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = label; btn.classList.remove('copied'); }, 1500);
+    });
+  });
+}
+setupCopy('copy-prompt', () => promptText, 'Copy Prompt');
+setupCopy('copy-sql', () => sqlText, 'Copy SQL');
+
+// ── Venn diagram ──
+function renderVenn() {
+  const svg = document.getElementById('venn');
+  const type = state.join;
+  // Left circle center: 70,60  Right: 130,60  r=45
+  let leftFill = 'none', rightFill = 'none', interFill = 'none';
+  const lc = '#61afef', rc = '#c678dd';
+
+  if (type === 'INNER JOIN') { interFill = '#e5c07b'; }
+  else if (type === 'LEFT JOIN') { leftFill = lc; interFill = '#e5c07b'; }
+  else if (type === 'RIGHT JOIN') { rightFill = rc; interFill = '#e5c07b'; }
+  else { leftFill = lc; rightFill = rc; interFill = '#e5c07b'; }
+
+  svg.innerHTML = `
+    <defs>
+      <clipPath id="clip-left"><circle cx="70" cy="60" r="45"/></clipPath>
+      <clipPath id="clip-right"><circle cx="130" cy="60" r="45"/></clipPath>
+    </defs>
+    <!-- Fills -->
+    <circle cx="70" cy="60" r="45" fill="${leftFill}" class="fill-area"/>
+    <circle cx="130" cy="60" r="45" fill="${rightFill}" class="fill-area"/>
+    <!-- Intersection -->
+    <g clip-path="url(#clip-left)">
+      <circle cx="130" cy="60" r="45" fill="${interFill}" class="fill-area"/>
+    </g>
+    <!-- Outlines -->
+    <circle cx="70" cy="60" r="45" class="left-circle"/>
+    <circle cx="130" cy="60" r="45" class="right-circle"/>
+    <text x="50" y="108" font-size="10" fill="#61afef" text-anchor="middle" font-family="system-ui">L</text>
+    <text x="150" y="108" font-size="10" fill="#c678dd" text-anchor="middle" font-family="system-ui">R</text>
+  `;
+}
+
+// ── Join logic ──
+function computeJoin() {
+  const leftT = TABLES[state.left];
+  const rightT = TABLES[state.right];
+  const jk = getJoinKey(state.left, state.right);
+
+  if (!jk) return { resultCols: [...leftT.cols, ...rightT.cols], resultRows: [], leftMatched: new Set(), rightMatched: new Set() };
+
+  const leftMatched = new Set();
+  const rightMatched = new Set();
+  const resultRows = [];
+
+  // Find matches
+  leftT.rows.forEach((lr, li) => {
+    let hasMatch = false;
+    rightT.rows.forEach((rr, ri) => {
+      const lv = lr[jk.left];
+      const rv = rr[jk.right];
+      if (lv !== null && lv !== undefined && lv === rv) {
+        hasMatch = true;
+        leftMatched.add(li);
+        rightMatched.add(ri);
+        const row = {};
+        leftT.cols.forEach(c => row['L.' + c] = lr[c]);
+        rightT.cols.forEach(c => row['R.' + c] = rr[c]);
+        row._type = 'matched';
+        resultRows.push(row);
+      }
+    });
+
+    if (!hasMatch && (state.join === 'LEFT JOIN' || state.join === 'FULL OUTER JOIN')) {
+      const row = {};
+      leftT.cols.forEach(c => row['L.' + c] = lr[c]);
+      rightT.cols.forEach(c => row['R.' + c] = null);
+      row._type = 'left-only';
+      resultRows.push(row);
+    }
+  });
+
+  if (state.join === 'RIGHT JOIN' || state.join === 'FULL OUTER JOIN') {
+    rightT.rows.forEach((rr, ri) => {
+      if (!rightMatched.has(ri)) {
+        const row = {};
+        leftT.cols.forEach(c => row['L.' + c] = null);
+        rightT.cols.forEach(c => row['R.' + c] = rr[c]);
+        row._type = 'right-only';
+        resultRows.push(row);
+      }
+    });
+  }
+
+  const resultCols = [
+    ...leftT.cols.map(c => 'L.' + c),
+    ...rightT.cols.map(c => 'R.' + c),
+  ];
+
+  return { resultCols, resultRows, leftMatched, rightMatched };
+}
+
+// ── Render tables ──
+function renderSourceTable(container, table, joinCol, matchedSet, side) {
+  const cls = side === 'left' ? 'left-src' : 'right-src';
+  let html = `<div class="table-header">${table.label} <span class="row-count">${table.rows.length} rows</span></div>`;
+  html += '<table><tr>';
+  table.cols.forEach(c => html += `<th>${c}</th>`);
+  html += '</tr>';
+  table.rows.forEach((row, i) => {
+    const matched = matchedSet.has(i);
+    const cls2 = matched ? 'highlighted' : (state.join !== 'INNER JOIN' ? '' : 'dimmed');
+    html += `<tr class="${cls2}">`;
+    table.cols.forEach(c => {
+      const isJoin = c === joinCol;
+      const val = row[c] === null ? 'NULL' : row[c];
+      html += `<td class="${isJoin ? 'join-col' : ''}">${val}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</table>';
+  container.innerHTML = html;
+}
+
+function renderResultTable(container, cols, rows) {
+  let html = `<div class="table-header">Result <span class="row-count">${rows.length} rows</span></div>`;
+  html += '<table><tr>';
+  cols.forEach(c => html += `<th>${c}</th>`);
+  html += '</tr>';
+  rows.forEach(row => {
+    const cls = row._type === 'left-only' || row._type === 'right-only' ? 'null-row' : 'matched';
+    html += `<tr class="${cls}">`;
+    cols.forEach(c => {
+      const val = row[c] === null || row[c] === undefined ? 'NULL' : row[c];
+      html += `<td>${val}</td>`;
+    });
+    html += '</tr>';
+  });
+  if (rows.length === 0) {
+    html += `<tr><td colspan="${cols.length}" style="text-align:center;color:#666;padding:16px;font-style:italic">No matching rows — these tables have no join relationship</td></tr>`;
+  }
+  html += '</table>';
+  container.innerHTML = html;
+}
+
+// ── Update all ──
+function updateAll() {
+  // Highlight active join
+  elJoinTypes.querySelectorAll('.join-btn').forEach(b =>
+    b.classList.toggle('active', b.textContent === state.join));
+
+  const jk = getJoinKey(state.left, state.right);
+  const { resultCols, resultRows, leftMatched, rightMatched } = computeJoin();
+
+  const leftT = TABLES[state.left];
+  const rightT = TABLES[state.right];
+
+  renderSourceTable(document.getElementById('left-display'), leftT, jk ? jk.left : '', leftMatched, 'left');
+  renderSourceTable(document.getElementById('right-display'), rightT, jk ? jk.right : '', rightMatched, 'right');
+  renderResultTable(document.getElementById('result-display'), resultCols, resultRows);
+
+  // Join ON display
+  const joinOnEl = document.getElementById('join-on');
+  if (jk) {
+    joinOnEl.innerHTML = `<span class="kw">${state.join}</span> <span class="tbl">${state.right}</span> <span class="kw">ON</span> <span class="tbl">${state.left}</span>.<span class="col">${jk.left}</span> = <span class="tbl">${state.right}</span>.<span class="col">${jk.right}</span>`;
+  } else {
+    joinOnEl.innerHTML = `<span style="color:#e06c75">No direct foreign key between ${state.left} and ${state.right}</span>`;
+  }
+
+  // Explanation
+  document.getElementById('explanation').innerHTML = JOIN_EXPLANATIONS[state.join] +
+    (jk ? `<br><br>Here: <b>${leftT.rows.length}</b> left rows, <b>${rightT.rows.length}</b> right rows → <b>${resultRows.length}</b> result rows.` : '');
+
+  renderVenn();
+  updatePrompt(resultRows);
+  updateSQL(jk);
+}
+
+function updatePrompt(resultRows) {
+  const jk = getJoinKey(state.left, state.right);
+  if (!jk) {
+    promptText = `There's no direct foreign key between ${state.left} and ${state.right}. You'd need an intermediate join table.`;
+  } else {
+    const joinDesc = {
+      'INNER JOIN': 'only the matching rows from both tables',
+      'LEFT JOIN': `all ${state.left} rows, with matching ${state.right} data (NULLs where no match)`,
+      'RIGHT JOIN': `all ${state.right} rows, with matching ${state.left} data (NULLs where no match)`,
+      'FULL OUTER JOIN': 'all rows from both tables, NULLs on both sides where unmatched',
+    };
+    promptText = `Write a query that uses ${state.join} to combine ${state.left} and ${state.right} on ${state.left}.${jk.left} = ${state.right}.${jk.right}. This returns ${joinDesc[state.join]}. Result: ${resultRows.length} rows.`;
+  }
+  document.getElementById('prompt-output').textContent = promptText;
+}
+
+function updateSQL(jk) {
+  if (!jk) {
+    sqlText = `-- No direct relationship between ${state.left} and ${state.right}`;
+    document.getElementById('sql-output').innerHTML = `<span class="cmt">${sqlText}</span>`;
+    return;
+  }
+  const leftT = TABLES[state.left];
+  const rightT = TABLES[state.right];
+  const lAlias = state.left[0];
+  const rAlias = state.right === state.left ? state.right[0] + '2' : state.right[0];
+
+  sqlText = `SELECT\n  ${leftT.cols.map(c => lAlias + '.' + c).join(',\n  ')},\n  ${rightT.cols.map(c => rAlias + '.' + c).join(',\n  ')}\nFROM ${state.left} ${lAlias}\n${state.join} ${state.right} ${rAlias}\n  ON ${lAlias}.${jk.left} = ${rAlias}.${jk.right};`;
+
+  const highlighted = sqlText
+    .replace(/\b(SELECT|FROM|ON|INNER JOIN|LEFT JOIN|RIGHT JOIN|FULL OUTER JOIN)\b/g, '<span class="kw">$&</span>')
+    .replace(new RegExp(`\\b(${tableNames.join('|')})\\b`, 'g'), '<span class="tbl">$1</span>');
+
+  document.getElementById('sql-output').innerHTML = highlighted;
+}
+
+// ── Init ──
+updateAll();
+</script>
+</body>
+</html>

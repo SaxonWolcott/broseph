@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RLS Simulator — Broseph</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#111;color:#e0e0e0;height:100vh;display:flex;overflow:hidden}
+  :root{--mono:'SF Mono','Cascadia Code','Consolas',monospace;--accent:#e06c75;--pass:#98c379;--block:#e06c75;--warn:#e5c07b}
+
+  .controls{width:340px;min-width:340px;background:#1a1a1a;border-right:1px solid #333;display:flex;flex-direction:column}
+  .controls-header{padding:20px 20px 0}
+  .controls h1{font-size:18px;font-weight:700;color:#fff}
+  .controls h1 span{color:var(--accent)}
+  .controls-scroll{flex:1;overflow-y:auto;padding:16px 20px 20px;display:flex;flex-direction:column;gap:16px}
+  .group-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#666;margin-bottom:4px}
+  .control-group{display:flex;flex-direction:column;gap:8px}
+
+  /* User selector */
+  .user-cards{display:flex;flex-direction:column;gap:6px}
+  .user-card{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#222;border:1px solid #333;border-radius:8px;cursor:pointer;transition:all 0.15s}
+  .user-card:hover{border-color:#555}
+  .user-card.active{border-color:var(--accent);background:#2a1a1a}
+  .user-card.service{border-color:#e5c07b55}
+  .user-card.service.active{border-color:#e5c07b;background:#2a2a1a}
+  .user-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0}
+  .user-info{flex:1}
+  .user-name{font-size:13px;font-weight:600;color:#eee}
+  .user-detail{font-size:11px;color:#777;font-family:var(--mono)}
+  .user-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;font-family:var(--mono)}
+  .badge-owner{background:#e5c07b22;color:#e5c07b}
+  .badge-member{background:#61afef22;color:#61afef}
+  .badge-none{background:#55555522;color:#666}
+  .badge-service{background:#e5c07b22;color:#e5c07b}
+
+  /* Operation selector */
+  .op-row{display:flex;gap:6px}
+  .op-btn{flex:1;background:#252525;border:1px solid #3a3a3a;color:#ccc;padding:7px;border-radius:6px;font-size:12px;font-family:var(--mono);cursor:pointer;transition:all 0.15s;text-align:center}
+  .op-btn:hover{border-color:#555;color:#fff}
+  .op-btn.active{background:rgba(224,108,117,0.12);border-color:var(--accent);color:var(--accent)}
+
+  /* Table selector */
+  .table-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .table-chip{background:#252525;border:1px solid #3a3a3a;color:#ccc;padding:5px 12px;border-radius:6px;font-size:12px;font-family:var(--mono);cursor:pointer;transition:all 0.15s}
+  .table-chip:hover{border-color:#555;color:#fff}
+  .table-chip.active{background:rgba(224,108,117,0.12);border-color:var(--accent);color:var(--accent)}
+
+  /* Policy display */
+  .policy-card{background:#1e1e2e;border:1px solid #333;border-radius:8px;padding:12px;font-size:12px;line-height:1.6}
+  .policy-name{font-weight:600;color:var(--accent);margin-bottom:4px}
+  .policy-condition{font-family:var(--mono);color:#999;font-size:11px;background:#181828;padding:6px 8px;border-radius:4px;margin-top:4px;word-break:break-all}
+  .policy-verdict{display:flex;align-items:center;gap:6px;margin-top:8px;font-weight:600;font-size:12px}
+  .verdict-pass{color:var(--pass)}
+  .verdict-block{color:var(--block)}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .dot-pass{background:var(--pass)}
+  .dot-block{background:var(--block)}
+
+  /* Main */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .preview-area{flex:1;padding:24px;overflow:auto;display:flex;flex-direction:column;gap:16px}
+  .preview-header{display:flex;justify-content:space-between;align-items:center}
+  .preview-title{font-size:13px;color:#666;font-weight:500}
+  .visible-count{font-family:var(--mono);font-size:12px;color:#555}
+  .visible-count strong{color:var(--accent)}
+
+  .data-table{border-radius:8px;overflow:hidden;border:1px solid #333}
+  .table-header-bar{padding:8px 12px;font-size:12px;font-weight:600;background:rgba(224,108,117,0.08);color:var(--accent);display:flex;justify-content:space-between}
+  .table-header-bar .row-count{font-weight:400;opacity:0.6;font-family:var(--mono);font-size:11px}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;padding:6px 10px;font-size:11px;font-weight:600;color:#888;background:#1a1a1a;border-bottom:1px solid #333;font-family:var(--mono)}
+  td{padding:6px 10px;font-size:12px;font-family:var(--mono);border-bottom:1px solid #222;color:#ccc;transition:all 0.3s}
+  tr.row-visible td{background:rgba(152,195,121,0.06)}
+  tr.row-blocked td{opacity:0.25;text-decoration:line-through;color:#e06c75}
+  tr.row-blocked td.status-cell{opacity:1;text-decoration:none}
+  .status-cell{width:60px;text-align:center}
+  .row-status{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;font-family:var(--mono)}
+  .status-pass{background:#98c37922;color:#98c379}
+  .status-block{background:#e06c7522;color:#e06c75}
+
+  /* Bottom panel */
+  .bottom-panel{border-top:1px solid #333;background:#1a1a1a;display:flex;flex-direction:column}
+  .tabs{display:flex;border-bottom:1px solid #333}
+  .tab{padding:8px 16px;font-size:12px;font-weight:500;color:#666;background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;font-family:inherit}
+  .tab:hover{color:#999}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-content{padding:14px 20px;display:none}
+  .tab-content.active{display:block}
+  .prompt-text{font-size:13px;line-height:1.6;color:#ccc}
+  .sql-code{font-family:var(--mono);font-size:12px;line-height:1.6;color:#ccc;white-space:pre-wrap}
+  .sql-code .kw{color:#e5c07b;font-weight:600}
+  .sql-code .fn{color:#61afef}
+  .sql-code .str{color:#98c379}
+  .sql-code .cmt{color:#555;font-style:italic}
+  .copy-row{display:flex;justify-content:flex-end;margin-top:10px}
+  .copy-btn{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;transition:all 0.15s}
+  .copy-btn:hover{filter:brightness(1.15)}
+  .copy-btn.copied{background:var(--pass)}
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <div class="controls-header"><h1><span>RLS</span> Simulator</h1></div>
+  <div class="controls-scroll">
+
+    <div class="control-group">
+      <div class="group-label">Authenticated As (auth.uid())</div>
+      <div class="user-cards" id="user-cards"></div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">Operation</div>
+      <div class="op-row" id="op-row"></div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">Table</div>
+      <div class="table-chips" id="table-chips"></div>
+    </div>
+
+    <div class="control-group">
+      <div class="group-label">Matching Policy</div>
+      <div id="policy-display"></div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="preview-area">
+    <div class="preview-header">
+      <span class="preview-title" id="preview-title">Table data</span>
+      <span class="visible-count" id="visible-count"></span>
+    </div>
+    <div class="data-table" id="data-table"></div>
+  </div>
+
+  <div class="bottom-panel">
+    <div class="tabs">
+      <button class="tab active" data-tab="prompt">Explanation</button>
+      <button class="tab" data-tab="sql">Policy SQL</button>
+    </div>
+    <div class="tab-content active" id="tab-prompt">
+      <div class="prompt-text" id="prompt-output"></div>
+      <div class="copy-row"><button class="copy-btn" id="copy-prompt">Copy</button></div>
+    </div>
+    <div class="tab-content" id="tab-sql">
+      <div class="sql-code" id="sql-output"></div>
+      <div class="copy-row"><button class="copy-btn" id="copy-sql">Copy SQL</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Broseph data model ──
+const USERS = {
+  u1: { id: 'u1', name: 'Alice',   color: '#e06c75', groups: ['g1','g2'], roles: { g1:'owner', g2:'member' } },
+  u2: { id: 'u2', name: 'Bob',     color: '#61afef', groups: ['g1','g2'], roles: { g1:'member', g2:'owner' } },
+  u3: { id: 'u3', name: 'Charlie', color: '#98c379', groups: ['g1'],      roles: { g1:'member' } },
+  u4: { id: 'u4', name: 'Diana',   color: '#c678dd', groups: [],          roles: {} },
+  service: { id: 'service_role', name: 'Service Role', color: '#e5c07b', groups: [], roles: {} },
+};
+
+const DATA = {
+  profiles: {
+    cols: ['id','display_name','handle'],
+    rows: [
+      { id:'u1', display_name:'Alice',   handle:'alice99' },
+      { id:'u2', display_name:'Bob',     handle:'bob_dev' },
+      { id:'u3', display_name:'Charlie', handle: null },
+      { id:'u4', display_name:'Diana',   handle:'diana_d' },
+    ],
+  },
+  groups: {
+    cols: ['id','name','owner_id'],
+    rows: [
+      { id:'g1', name:'College Bros', owner_id:'u1' },
+      { id:'g2', name:'Work Chat',    owner_id:'u2' },
+    ],
+  },
+  group_members: {
+    cols: ['group_id','user_id','role'],
+    rows: [
+      { group_id:'g1', user_id:'u1', role:'owner' },
+      { group_id:'g1', user_id:'u2', role:'member' },
+      { group_id:'g1', user_id:'u3', role:'member' },
+      { group_id:'g2', user_id:'u2', role:'owner' },
+      { group_id:'g2', user_id:'u1', role:'member' },
+    ],
+  },
+  messages: {
+    cols: ['id','group_id','sender_id','content','type'],
+    rows: [
+      { id:'m1', group_id:'g1', sender_id:'u1', content:'Hey everyone!',  type:'message' },
+      { id:'m2', group_id:'g1', sender_id:'u2', content:'Sup!',           type:'message' },
+      { id:'m3', group_id:'g2', sender_id:'u2', content:'Meeting at 3',   type:'message' },
+      { id:'m4', group_id:'g1', sender_id:null,  content:'Bob joined',    type:'system' },
+      { id:'m5', group_id:'g2', sender_id:'u1', content:'On my way',      type:'message' },
+    ],
+  },
+  group_invites: {
+    cols: ['id','group_id','invited_by','email','used_at','expires_at'],
+    rows: [
+      { id:'inv1', group_id:'g1', invited_by:'u1', email:'new@test.com', used_at:null,            expires_at:'2026-03-01' },
+      { id:'inv2', group_id:'g1', invited_by:'u2', email:'old@test.com', used_at:'2025-12-01',    expires_at:'2025-12-15' },
+      { id:'inv3', group_id:'g2', invited_by:'u2', email:'dev@work.com', used_at:null,            expires_at:'2026-02-15' },
+    ],
+  },
+};
+
+// ── RLS Policies (modeled after real Broseph) ──
+const POLICIES = {
+  profiles: {
+    SELECT: [
+      {
+        name: 'Users can view profiles of group members',
+        condition: 'id IN (SELECT user_id FROM group_members WHERE group_id IN get_user_group_ids()) OR id = auth.uid()',
+        check: (row, user) => {
+          if (user.id === 'service_role') return true;
+          if (row.id === user.id) return true;
+          const userGroupIds = user.groups;
+          // Can see anyone who shares a group
+          const sharedGroupUsers = new Set();
+          DATA.group_members.rows.forEach(gm => {
+            if (userGroupIds.includes(gm.group_id)) sharedGroupUsers.add(gm.user_id);
+          });
+          return sharedGroupUsers.has(row.id);
+        },
+      },
+    ],
+    UPDATE: [
+      {
+        name: 'Users can update own profile',
+        condition: 'auth.uid() = id',
+        check: (row, user) => user.id === 'service_role' || row.id === user.id,
+      },
+    ],
+    INSERT: [
+      {
+        name: 'Service role only',
+        condition: "auth.role() = 'service_role'",
+        check: (row, user) => user.id === 'service_role',
+      },
+    ],
+    DELETE: [
+      {
+        name: 'Service role only',
+        condition: "auth.role() = 'service_role'",
+        check: (row, user) => user.id === 'service_role',
+      },
+    ],
+  },
+  groups: {
+    SELECT: [
+      {
+        name: 'Members can view groups',
+        condition: 'is_group_member(id)',
+        check: (row, user) => user.id === 'service_role' || user.groups.includes(row.id),
+      },
+    ],
+    UPDATE: [{ name:'Service role only', condition:"auth.role() = 'service_role'", check:(_,u) => u.id==='service_role' }],
+    INSERT: [{ name:'Service role only', condition:"auth.role() = 'service_role'", check:(_,u) => u.id==='service_role' }],
+    DELETE: [{ name:'Service role only', condition:"auth.role() = 'service_role'", check:(_,u) => u.id==='service_role' }],
+  },
+  group_members: {
+    SELECT: [
+      {
+        name: 'Members can view group members',
+        condition: 'is_group_member(group_id)',
+        check: (row, user) => user.id === 'service_role' || user.groups.includes(row.group_id),
+      },
+    ],
+    UPDATE: [{ name:'Service role only', condition:"auth.role() = 'service_role'", check:(_,u) => u.id==='service_role' }],
+    INSERT: [{ name:'Service role only', condition:"auth.role() = 'service_role'", check:(_,u) => u.id==='service_role' }],
+    DELETE: [{ name:'Service role only', condition:"auth.role() = 'service_role'", check:(_,u) => u.id==='service_role' }],
+  },
+  messages: {
+    SELECT: [
+      {
+        name: 'Members can view messages',
+        condition: 'is_group_member(group_id)',
+        check: (row, user) => user.id === 'service_role' || user.groups.includes(row.group_id),
+      },
+    ],
+    UPDATE: [{ name:'Service role only', condition:"auth.role() = 'service_role'", check:(_,u) => u.id==='service_role' }],
+    INSERT: [{ name:'Service role only', condition:"auth.role() = 'service_role'", check:(_,u) => u.id==='service_role' }],
+    DELETE: [{ name:'Service role only', condition:"auth.role() = 'service_role'", check:(_,u) => u.id==='service_role' }],
+  },
+  group_invites: {
+    SELECT: [
+      {
+        name: 'Anyone can view valid invites',
+        condition: 'used_at IS NULL AND expires_at > NOW()',
+        check: (row, user) => {
+          if (user.id === 'service_role') return true;
+          return row.used_at === null && row.expires_at > '2026-02-04';
+        },
+      },
+      {
+        name: 'Members can view group invites',
+        condition: 'is_group_member(group_id)',
+        check: (row, user) => user.id === 'service_role' || user.groups.includes(row.group_id),
+      },
+    ],
+    INSERT: [
+      {
+        name: 'Members can create invites',
+        condition: 'is_group_member(group_id) AND invited_by = auth.uid()',
+        check: (row, user) => user.id === 'service_role' || (user.groups.includes(row.group_id) && row.invited_by === user.id),
+      },
+    ],
+    UPDATE: [{ name:'Service role only', condition:"auth.role() = 'service_role'", check:(_,u) => u.id==='service_role' }],
+    DELETE: [{ name:'Service role only', condition:"auth.role() = 'service_role'", check:(_,u) => u.id==='service_role' }],
+  },
+};
+
+// ── State ──
+const state = { userId: 'u1', table: 'profiles', operation: 'SELECT' };
+const OPS = ['SELECT','INSERT','UPDATE','DELETE'];
+
+// ── Build user cards ──
+const userCardsEl = document.getElementById('user-cards');
+Object.values(USERS).forEach(u => {
+  const card = document.createElement('div');
+  card.className = 'user-card' + (u.id === 'service_role' ? ' service' : '');
+  card.dataset.uid = u.id;
+
+  const groupBadges = u.id === 'service_role'
+    ? '<span class="user-badge badge-service">ADMIN</span>'
+    : u.groups.length > 0
+      ? u.groups.map(gid => {
+          const g = DATA.groups.rows.find(r => r.id === gid);
+          const role = u.roles[gid];
+          return `<span class="user-badge badge-${role}">${g ? g.name : gid}</span>`;
+        }).join(' ')
+      : '<span class="user-badge badge-none">no groups</span>';
+
+  card.innerHTML = `
+    <div class="user-avatar" style="background:${u.color}">${u.name[0]}</div>
+    <div class="user-info">
+      <div class="user-name">${u.name}</div>
+      <div class="user-detail">${u.id === 'service_role' ? 'Bypasses all RLS' : 'uid: ' + u.id}</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end">${groupBadges}</div>
+  `;
+  card.addEventListener('click', () => { state.userId = u.id; updateAll(); });
+  userCardsEl.appendChild(card);
+});
+
+// Ops
+const opRow = document.getElementById('op-row');
+OPS.forEach(op => {
+  const btn = document.createElement('button');
+  btn.className = 'op-btn';
+  btn.textContent = op;
+  btn.addEventListener('click', () => { state.operation = op; updateAll(); });
+  opRow.appendChild(btn);
+});
+
+// Tables
+const tableChips = document.getElementById('table-chips');
+Object.keys(DATA).forEach(t => {
+  const chip = document.createElement('button');
+  chip.className = 'table-chip';
+  chip.textContent = t;
+  chip.addEventListener('click', () => { state.table = t; updateAll(); });
+  tableChips.appendChild(chip);
+});
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// Copy
+let promptText = '', sqlText = '';
+function setupCopy(btnId, getFn, label) {
+  const btn = document.getElementById(btnId);
+  btn.addEventListener('click', () => {
+    navigator.clipboard.writeText(getFn()).then(() => {
+      btn.textContent='Copied!'; btn.classList.add('copied');
+      setTimeout(()=>{ btn.textContent=label; btn.classList.remove('copied'); },1500);
+    });
+  });
+}
+setupCopy('copy-prompt', () => promptText, 'Copy');
+setupCopy('copy-sql', () => sqlText, 'Copy SQL');
+
+// ── Generate INSERT examples ──
+// Instead of showing existing rows, show hypothetical rows the user might try to insert
+function generateInsertExamples(user) {
+  const uid = user.id;
+  const t = state.table;
+
+  if (uid === 'service_role') {
+    // Service role can insert anything — show a simple example
+    return DATA[t].rows.slice(0, 2).map(r => ({ ...r }));
+  }
+
+  const examples = [];
+  if (t === 'profiles') {
+    examples.push({ id: uid, display_name: user.name, handle: 'new_handle', _label: 'Own profile', _highlight: ['id'] });
+    examples.push({ id: 'u99', display_name: 'Fake', handle: 'hacker', _label: 'Other user profile', _highlight: ['id'] });
+  } else if (t === 'groups') {
+    examples.push({ id: 'g99', name: 'New Group', owner_id: uid, _label: 'New group', _highlight: ['owner_id'] });
+  } else if (t === 'group_members') {
+    if (user.groups.length > 0) {
+      examples.push({ group_id: user.groups[0], user_id: uid, role: 'member', _label: 'Join own group', _highlight: ['user_id'] });
+    }
+    examples.push({ group_id: 'g2', user_id: 'u99', role: 'member', _label: 'Add stranger', _highlight: ['user_id'] });
+  } else if (t === 'messages') {
+    if (user.groups.length > 0) {
+      examples.push({ id: 'm99', group_id: user.groups[0], sender_id: uid, content: 'Hello!', type: 'message', _label: 'Own message in own group', _highlight: ['sender_id', 'group_id'] });
+    }
+    examples.push({ id: 'm98', group_id: 'g2', sender_id: uid, content: 'Sneaky', type: 'message', _label: 'Message in other group', _highlight: ['group_id'] });
+    examples.push({ id: 'm97', group_id: user.groups[0] || 'g1', sender_id: 'u99', content: 'Impersonate', type: 'message', _label: 'Spoofed sender', _highlight: ['sender_id'] });
+  } else if (t === 'group_invites') {
+    // This is the key one — show Charlie CAN invite for his groups
+    if (user.groups.length > 0) {
+      user.groups.forEach(gid => {
+        const g = DATA.groups.rows.find(r => r.id === gid);
+        examples.push({ id: 'inv_new', group_id: gid, invited_by: uid, email: 'friend@test.com', used_at: null, expires_at: '2026-06-01', _label: `Invite to ${g ? g.name : gid} (own invite)`, _highlight: ['invited_by', 'group_id'] });
+      });
+    }
+    // Try to invite to a group they're NOT in
+    const notInGroup = DATA.groups.rows.find(g => !user.groups.includes(g.id));
+    if (notInGroup) {
+      examples.push({ id: 'inv_bad1', group_id: notInGroup.id, invited_by: uid, email: 'spy@test.com', used_at: null, expires_at: '2026-06-01', _label: `Invite to ${notInGroup.name} (not a member!)`, _highlight: ['group_id'] });
+    }
+    // Try to spoof invited_by
+    if (user.groups.length > 0) {
+      examples.push({ id: 'inv_bad2', group_id: user.groups[0], invited_by: 'u99', email: 'fake@test.com', used_at: null, expires_at: '2026-06-01', _label: 'Spoofed invited_by', _highlight: ['invited_by'] });
+    }
+  }
+
+  return examples;
+}
+
+// ── Evaluate ──
+function evaluateRow(row) {
+  const user = USERS[state.userId];
+  const policies = POLICIES[state.table]?.[state.operation] || [];
+
+  if (user.id === 'service_role') return { visible: true, matchedPolicy: 'Service role bypasses RLS' };
+
+  for (const policy of policies) {
+    if (policy.check(row, user)) {
+      return { visible: true, matchedPolicy: policy.name };
+    }
+  }
+
+  return { visible: false, matchedPolicy: null };
+}
+
+// ── Render ──
+function updateAll() {
+  const user = USERS[state.userId];
+  const tableData = DATA[state.table];
+  const policies = POLICIES[state.table]?.[state.operation] || [];
+
+  // Highlight active controls
+  userCardsEl.querySelectorAll('.user-card').forEach(c => c.classList.toggle('active', c.dataset.uid === state.userId));
+  opRow.querySelectorAll('.op-btn').forEach(b => b.classList.toggle('active', b.textContent === state.operation));
+  tableChips.querySelectorAll('.table-chip').forEach(c => c.classList.toggle('active', c.textContent === state.table));
+
+  // For INSERT, show hypothetical new rows instead of existing data
+  const isWrite = state.operation === 'INSERT';
+  const displayRows = isWrite ? generateInsertExamples(user) : tableData.rows;
+  const results = displayRows.map(row => ({ ...row, ...evaluateRow(row) }));
+  const visibleCount = results.filter(r => r.visible).length;
+
+  // Header
+  document.getElementById('preview-title').textContent = `${state.table} — ${state.operation} as ${user.name}`;
+  if (isWrite) {
+    document.getElementById('visible-count').innerHTML = `<strong>${visibleCount}</strong> of ${results.length} example rows ${user.name} <em>could</em> insert`;
+  } else {
+    document.getElementById('visible-count').innerHTML = `<strong>${visibleCount}</strong> of ${results.length} rows ${state.operation === 'SELECT' ? 'visible' : 'allowed'}`;
+  }
+
+  // Table
+  const container = document.getElementById('data-table');
+  let html = `<div class="table-header-bar">${state.table} <span class="row-count">${state.operation} · RLS enabled</span></div>`;
+  if (isWrite) {
+    html += `<div style="padding:8px 12px;font-size:11px;color:#e5c07b;background:#e5c07b0a;border-bottom:1px solid #333">⚡ INSERT policies check the <strong>new row being written</strong>, not existing data. These are example rows ${user.name} might try to insert:</div>`;
+  }
+  html += '<table><tr><th class="status-cell">RLS</th>';
+  tableData.cols.forEach(c => html += `<th>${c}</th>`);
+  html += '</tr>';
+
+  results.forEach(row => {
+    const cls = row.visible ? 'row-visible' : 'row-blocked';
+    html += `<tr class="${cls}">`;
+    html += `<td class="status-cell"><span class="row-status ${row.visible ? 'status-pass' : 'status-block'}">${row.visible ? '✓' : '✗'}</span></td>`;
+    tableData.cols.forEach(c => {
+      const val = row[c] === null ? 'NULL' : row[c];
+      const isHighlight = row._highlight && row._highlight.includes(c);
+      html += `<td${isHighlight ? ' style="color:#e5c07b;font-weight:600"' : ''}>${val}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</table>';
+  container.innerHTML = html;
+
+  // Policy display
+  const policyEl = document.getElementById('policy-display');
+  if (user.id === 'service_role') {
+    policyEl.innerHTML = '<div class="policy-card"><div class="policy-name">Service Role</div>The service_role key bypasses ALL Row Level Security policies. This is used by the backend API server — never exposed to the client.<div class="policy-verdict verdict-pass"><span class="dot dot-pass"></span> All operations allowed on all rows</div></div>';
+  } else if (policies.length === 0) {
+    policyEl.innerHTML = '<div class="policy-card"><div class="policy-name">No Policy</div>No RLS policy grants this operation. All rows are blocked.<div class="policy-verdict verdict-block"><span class="dot dot-block"></span> Blocked — no matching policy</div></div>';
+  } else {
+    policyEl.innerHTML = policies.map(p => {
+      const anyMatch = results.some(r => r.visible && r.matchedPolicy === p.name);
+      return `<div class="policy-card" style="margin-bottom:8px">
+        <div class="policy-name">${p.name}</div>
+        <div class="policy-condition">${p.condition}</div>
+        <div class="policy-verdict ${anyMatch ? 'verdict-pass' : 'verdict-block'}">
+          <span class="dot ${anyMatch ? 'dot-pass' : 'dot-block'}"></span>
+          ${anyMatch ? 'Grants access to some rows' : 'No rows match for this user'}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  updateExplanation(user, results, visibleCount, policies);
+  updatePolicySQL(policies);
+}
+
+function updateExplanation(user, results, visibleCount, policies) {
+  if (user.id === 'service_role') {
+    promptText = `The service_role bypasses Row Level Security entirely. It sees all ${results.length} rows in ${state.table}. In Broseph, the backend API uses the service key for writes (INSERT/UPDATE/DELETE), while user-scoped operations use the anon key with the user's JWT — which enforces RLS.`;
+  } else if (state.operation === 'INSERT') {
+    const allowed = results.filter(r => r.visible);
+    const blocked = results.filter(r => !r.visible);
+    if (allowed.length > 0 && blocked.length > 0) {
+      promptText = `INSERT policies check the NEW row being written — not existing data. ${user.name} can insert rows where the policy condition passes (${allowed.length} examples shown in green). The blocked examples (${blocked.length}) show what ${user.name} CAN'T insert — e.g., rows with a spoofed identity or for groups they don't belong to. The policy is: ${POLICIES[state.table]?.INSERT?.[0]?.condition || 'none'}.`;
+    } else if (allowed.length === 0) {
+      promptText = `${user.name} cannot INSERT into ${state.table}. The policy requires: ${POLICIES[state.table]?.INSERT?.[0]?.condition || 'service_role only'}. In Broseph, the backend API uses the service_role key for most writes.`;
+    } else {
+      promptText = `${user.name} can INSERT all shown example rows into ${state.table}.`;
+    }
+  } else if (visibleCount === 0 && state.operation !== 'SELECT') {
+    promptText = `${user.name} cannot ${state.operation} any rows in ${state.table}. In Broseph, write operations (INSERT/UPDATE/DELETE) on most tables are restricted to the service_role — the backend API handles these on behalf of users after validating permissions in application code.`;
+  } else {
+    const blockedRows = results.filter(r => !r.visible);
+    const groupNames = user.groups.map(gid => {
+      const g = DATA.groups.rows.find(r => r.id === gid);
+      return g ? g.name : gid;
+    });
+
+    let reason = '';
+    if (state.table === 'profiles' && state.operation === 'SELECT') {
+      reason = groupNames.length > 0
+        ? `${user.name} can see profiles of anyone sharing a group (${groupNames.join(', ')}), plus their own profile.`
+        : `${user.name} has no groups, so they can only see their own profile.`;
+      if (blockedRows.length > 0) reason += ` ${blockedRows.length} profile(s) are hidden because those users don't share any groups with ${user.name}.`;
+    } else if (['groups','group_members','messages'].includes(state.table) && state.operation === 'SELECT') {
+      reason = `${user.name} is a member of: ${groupNames.join(', ') || 'no groups'}. The is_group_member() function checks if auth.uid() has a row in group_members for that group_id.`;
+      if (blockedRows.length > 0) reason += ` ${blockedRows.length} row(s) are hidden because they belong to groups ${user.name} isn't in.`;
+    } else if (state.table === 'group_invites' && state.operation === 'SELECT') {
+      reason = `Two policies apply: (1) anyone can see unexpired, unused invites, and (2) group members can see all invites for their groups. ${user.name} gets the union of both.`;
+    } else {
+      reason = `${visibleCount} of ${results.length} rows are accessible.`;
+    }
+
+    promptText = reason;
+  }
+
+  document.getElementById('prompt-output').textContent = promptText;
+}
+
+function updatePolicySQL(policies) {
+  const lines = [`-- RLS policies for "${state.table}" (${state.operation})\n`];
+  if (policies.length === 0) {
+    lines.push('-- No policy exists for this operation.');
+    lines.push('-- With RLS enabled and no matching policy, ALL rows are blocked.');
+  } else {
+    policies.forEach(p => {
+      lines.push(`CREATE POLICY "${p.name}"`);
+      lines.push(`  ON public.${state.table}`);
+      lines.push(`  FOR ${state.operation}`);
+      lines.push(`  USING (${p.condition});\n`);
+    });
+  }
+  lines.push('\n-- Helper function used by policies:');
+  lines.push('CREATE FUNCTION is_group_member(check_group_id UUID)');
+  lines.push('RETURNS BOOLEAN AS $$');
+  lines.push('  SELECT EXISTS (');
+  lines.push('    SELECT 1 FROM group_members');
+  lines.push('    WHERE group_id = check_group_id');
+  lines.push('    AND user_id = auth.uid()');
+  lines.push('  )');
+  lines.push('$$ LANGUAGE sql SECURITY DEFINER STABLE;');
+
+  sqlText = lines.join('\n');
+
+  const highlighted = sqlText
+    .replace(/--.*$/gm, '<span class="cmt">$&</span>')
+    .replace(/\b(CREATE POLICY|CREATE FUNCTION|ON|FOR|USING|RETURNS|AS|LANGUAGE|SELECT|EXISTS|FROM|WHERE|AND)\b/g, '<span class="kw">$&</span>')
+    .replace(/\b(BOOLEAN|UUID|SECURITY DEFINER|STABLE|sql)\b/g, '<span class="fn">$&</span>')
+    .replace(/"[^"]*"/g, '<span class="str">$&</span>');
+
+  document.getElementById('sql-output').innerHTML = highlighted;
+}
+
+// ── Init ──
+updateAll();
+</script>
+</body>
+</html>

@@ -64,6 +64,7 @@ export function useSendMessage() {
             avatarUrl: user.user_metadata?.avatar_url ?? null,
           },
           content,
+          type: 'message',
           createdAt: new Date().toISOString(),
           pending: true,
         };

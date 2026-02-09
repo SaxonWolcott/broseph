@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Study Review Quiz — Broseph</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#111;color:#e0e0e0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:32px 16px}
+  :root{--mono:'SF Mono','Cascadia Code','Consolas',monospace;--accent:#61afef;--pass:#98c379;--fail:#e06c75;--warn:#e5c07b;--purple:#c678dd}
+
+  .quiz-container{max-width:720px;width:100%;display:flex;flex-direction:column;gap:24px}
+
+  /* Header */
+  .quiz-header{display:flex;justify-content:space-between;align-items:center}
+  .quiz-title{font-size:22px;font-weight:700;color:#fff}
+  .quiz-title span{color:var(--accent)}
+  .timer{font-family:var(--mono);font-size:16px;color:var(--warn);background:#e5c07b12;padding:6px 14px;border-radius:8px;border:1px solid #e5c07b33}
+  .timer.danger{color:var(--fail);background:#e06c7512;border-color:#e06c7533;animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+
+  /* Progress */
+  .progress-bar{height:6px;background:#252525;border-radius:3px;overflow:hidden}
+  .progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width 0.4s ease}
+
+  .progress-label{display:flex;justify-content:space-between;font-size:12px;color:#666}
+  .progress-label .category{color:var(--purple);font-weight:600}
+
+  /* Question card */
+  .question-card{background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:28px;display:flex;flex-direction:column;gap:20px;transition:border-color 0.3s}
+  .question-card.correct{border-color:var(--pass)}
+  .question-card.wrong{border-color:var(--fail)}
+
+  .q-category{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--purple)}
+
+  .q-text{font-size:16px;line-height:1.6;color:#eee;font-weight:500}
+
+  .q-code{font-family:var(--mono);font-size:13px;line-height:1.6;background:#1e1e2e;border:1px solid #333;border-radius:8px;padding:14px 16px;color:#ccc;white-space:pre-wrap;overflow-x:auto}
+  .q-code .kw{color:var(--warn)}
+  .q-code .fn{color:var(--accent)}
+  .q-code .str{color:var(--pass)}
+  .q-code .cmt{color:#555;font-style:italic}
+  .q-code .type{color:var(--purple)}
+
+  .q-context{font-size:13px;color:#888;line-height:1.5;background:#181828;border-radius:8px;padding:12px 14px;border-1px solid #2a2a3a}
+
+  /* Options */
+  .options{display:flex;flex-direction:column;gap:8px}
+  .option{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;background:#222;border:1px solid #333;border-radius:8px;cursor:pointer;transition:all 0.2s;font-size:14px;line-height:1.5;color:#ccc}
+  .option:hover{border-color:#555;background:#282828}
+  .option.selected{border-color:var(--accent);background:#1a2a3a;color:#fff}
+  .option.correct-answer{border-color:var(--pass);background:rgba(152,195,121,0.08);color:#fff}
+  .option.wrong-answer{border-color:var(--fail);background:rgba(224,108,117,0.08);color:#e06c75}
+  .option.disabled{pointer-events:none}
+
+  .option-letter{width:24px;height:24px;border-radius:6px;background:#333;color:#888;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:var(--mono);transition:all 0.2s}
+  .option.selected .option-letter{background:var(--accent);color:#fff}
+  .option.correct-answer .option-letter{background:var(--pass);color:#fff}
+  .option.wrong-answer .option-letter{background:var(--fail);color:#fff}
+
+  .option-text{flex:1}
+
+  /* Feedback */
+  .feedback{padding:14px 16px;border-radius:8px;font-size:13px;line-height:1.6;display:none}
+  .feedback.show{display:block}
+  .feedback.correct{background:#98c37912;border:1px solid #98c37933;color:var(--pass)}
+  .feedback.wrong{background:#e06c7512;border:1px solid #e06c7533;color:#e06c75}
+  .feedback .explanation{color:#ccc;margin-top:6px}
+
+  /* Buttons */
+  .btn-row{display:flex;justify-content:flex-end;gap:10px}
+  .btn{padding:10px 24px;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;transition:all 0.15s;border:none}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{filter:brightness(1.15)}
+  .btn-primary:disabled{opacity:0.4;cursor:not-allowed}
+  .btn-secondary{background:#252525;color:#ccc;border:1px solid #3a3a3a}
+  .btn-secondary:hover{background:#333;color:#fff}
+
+  /* Score screen */
+  .score-screen{text-align:center;padding:40px 20px}
+  .score-big{font-size:64px;font-weight:800;margin:20px 0 10px}
+  .score-big.great{color:var(--pass)}
+  .score-big.ok{color:var(--warn)}
+  .score-big.needs-work{color:var(--fail)}
+  .score-subtitle{font-size:18px;color:#999;margin-bottom:32px}
+  .score-breakdown{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:32px}
+  .score-cat{background:#1e1e2e;border:1px solid #333;border-radius:8px;padding:12px 18px;min-width:140px}
+  .score-cat-name{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:#888;margin-bottom:4px}
+  .score-cat-val{font-family:var(--mono);font-size:18px;font-weight:700}
+  .score-cat-val.perfect{color:var(--pass)}
+  .score-cat-val.partial{color:var(--warn)}
+  .score-cat-val.zero{color:var(--fail)}
+
+  .review-list{text-align:left;display:flex;flex-direction:column;gap:8px;margin-top:24px}
+  .review-item{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:#1a1a1a;border-radius:8px;font-size:13px;line-height:1.5}
+  .review-icon{font-size:14px;flex-shrink:0;margin-top:2px}
+  .review-q{color:#ccc;flex:1}
+  .review-q strong{color:var(--fail)}
+
+  /* Start screen */
+  .start-screen{text-align:center;padding:60px 20px}
+  .start-screen h2{font-size:28px;color:#fff;margin-bottom:12px}
+  .start-screen h2 span{color:var(--accent)}
+  .start-screen p{font-size:15px;color:#999;line-height:1.7;margin-bottom:8px}
+  .topic-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:24px 0 32px}
+  .topic-chip{background:#1e1e2e;border:1px solid #333;border-radius:6px;padding:6px 14px;font-size:12px;color:#ccc}
+  .topic-chip .count{color:var(--accent);font-family:var(--mono);margin-left:4px}
+</style>
+</head>
+<body>
+
+<div class="quiz-container" id="app"></div>
+
+<script>
+// ── Questions Bank ──
+const QUESTIONS = [
+  // ─── TypeScript ───
+  {
+    category: 'TypeScript',
+    text: 'What does this TypeScript type do?',
+    code: `<span class="kw">type</span> <span class="type">Pick</span>&lt;<span class="type">User</span>, <span class="str">'id'</span> | <span class="str">'email'</span>&gt;`,
+    options: [
+      'Creates a new type with only the id and email properties from User',
+      'Removes id and email from the User type',
+      'Makes id and email optional on User',
+      'Validates that User has id and email properties',
+    ],
+    correct: 0,
+    explanation: 'Pick<T, Keys> creates a new type by selecting a subset of properties from T. It\'s the opposite of Omit. In Broseph, this pattern is useful for DTOs where you only need certain fields from a larger type.',
+  },
+  {
+    category: 'TypeScript',
+    text: 'In NestJS, what does the <code>@</code> symbol before a class or method represent?',
+    options: [
+      'A decorator — a function that adds metadata or modifies behavior at declaration time',
+      'A private method accessor',
+      'A type annotation shorthand',
+      'An async operation marker',
+    ],
+    correct: 0,
+    explanation: 'Decorators are a TypeScript feature heavily used in NestJS. @Controller(), @Get(), @UseGuards() — these all attach metadata that NestJS reads at runtime to build the request pipeline. They\'re functions that receive the class/method and can modify it.',
+  },
+  {
+    category: 'TypeScript',
+    text: 'What\'s the difference between <code>interface</code> and <code>type</code> in TypeScript?',
+    options: [
+      'Interfaces are always faster at compile time',
+      'Types can represent unions and intersections; interfaces can be extended/merged across files',
+      'They are completely identical with no differences',
+      'Interfaces can only describe objects; types can only describe primitives',
+    ],
+    correct: 1,
+    explanation: 'Both can describe object shapes, but types support unions (A | B) and intersections (A & B), while interfaces support declaration merging (adding properties across files). In Broseph, DTOs use classes (for runtime validation), while pure type contracts use either.',
+  },
+
+  // ─── SQL & JOINs ───
+  {
+    category: 'SQL & JOINs',
+    text: 'In Broseph, you want all users including those who haven\'t joined any group yet (like Diana). Which query is correct?',
+    code: `<span class="kw">SELECT</span> p.display_name, gm.group_id\n<span class="kw">FROM</span> profiles p\n<span class="kw">_____ JOIN</span> group_members gm\n  <span class="kw">ON</span> p.id = gm.user_id`,
+    options: [
+      'INNER — only users with groups',
+      'LEFT — all users, NULLs where no group',
+      'RIGHT — all group_members rows, NULLs where no user',
+      'CROSS — every user paired with every membership',
+    ],
+    correct: 1,
+    explanation: 'LEFT JOIN keeps all rows from the left table (profiles) and fills NULLs for the right table (group_members) where there\'s no match. Diana has no group_members rows, so she\'d appear with group_id = NULL. Try this in the SQL JOIN playground!',
+  },
+  {
+    category: 'SQL & JOINs',
+    text: 'Why does Broseph\'s messages table have <code>sender_id UUID NULL</code> instead of NOT NULL?',
+    options: [
+      'It\'s a bug that should be fixed',
+      'To allow system messages (like "Bob joined") that have no human sender',
+      'Because foreign keys must always be nullable',
+      'To improve query performance on large tables',
+    ],
+    correct: 1,
+    explanation: 'The messages table has a "type" column with values \'message\' and \'system\'. System messages (e.g., "Bob joined the group") don\'t have a sender, so sender_id is NULL. This is a common pattern — nullable FKs to represent optional relationships.',
+  },
+  {
+    category: 'SQL & JOINs',
+    text: 'What does <code>ON DELETE CASCADE</code> mean on Broseph\'s <code>group_members.group_id → groups.id</code> foreign key?',
+    options: [
+      'Deleting a member also deletes the group',
+      'Deleting a group automatically deletes all its group_members rows',
+      'The delete is blocked if group_members reference the group',
+      'The group_id is set to NULL when the group is deleted',
+    ],
+    correct: 1,
+    explanation: 'CASCADE means the delete propagates forward through the foreign key. When a group is deleted, all group_members, messages, and invites referencing that group are automatically cleaned up. Without it, you\'d get foreign key violation errors.',
+  },
+
+  // ─── PostgreSQL ───
+  {
+    category: 'PostgreSQL',
+    text: 'Why does Broseph use <code>UUID</code> for primary keys instead of auto-incrementing integers?',
+    options: [
+      'UUIDs are always faster to index',
+      'UUIDs can be generated client-side, don\'t leak row count, and are safe across distributed systems',
+      'PostgreSQL doesn\'t support auto-increment',
+      'UUIDs use less storage space than integers',
+    ],
+    correct: 1,
+    explanation: 'UUIDs are globally unique without a central counter. A client can generate an ID before the INSERT (useful for optimistic UI). Sequential IDs leak information (user #47 tells an attacker there are ~47 users). UUIDs are larger (16 bytes vs 4), so it\'s a trade-off.',
+  },
+  {
+    category: 'PostgreSQL',
+    text: 'What does <code>SECURITY DEFINER</code> mean on Broseph\'s <code>is_group_member()</code> function?',
+    options: [
+      'The function runs with the permissions of the user who calls it',
+      'The function runs with the permissions of the user who CREATED it (bypassing RLS)',
+      'The function can only be called by admins',
+      'The function validates that the caller has a security token',
+    ],
+    correct: 1,
+    explanation: 'SECURITY DEFINER is critical in Broseph. RLS policies call is_group_member() which queries group_members — but group_members ALSO has RLS! Without SECURITY DEFINER, you\'d get infinite recursion. The function runs as its creator (superuser), bypassing RLS to do the membership check.',
+  },
+  {
+    category: 'PostgreSQL',
+    text: 'What does this Broseph index do?',
+    code: `<span class="kw">CREATE INDEX</span> idx_messages_group_created\n  <span class="kw">ON</span> messages (group_id, created_at <span class="kw">DESC</span>)`,
+    options: [
+      'Ensures group_id and created_at are unique together',
+      'Speeds up queries that filter by group_id and sort by created_at descending (cursor pagination)',
+      'Automatically deletes old messages',
+      'Forces messages to be stored in chronological order on disk',
+    ],
+    correct: 1,
+    explanation: 'This composite index is designed for Broseph\'s cursor pagination: "get messages in group X, ordered newest first, starting after cursor Y." The DESC ensures the index is already sorted for the most common query pattern — no extra sort step needed.',
+  },
+
+  // ─── Supabase ───
+  {
+    category: 'Supabase',
+    text: 'Broseph\'s backend uses TWO Supabase clients. Why?',
+    context: 'The API creates both a service-role client and a user-scoped client per request.',
+    options: [
+      'One for reads, one for writes — like a read replica',
+      'Service-role client bypasses RLS (for trusted writes); user-scoped client enforces RLS (for safe reads)',
+      'One connects to PostgreSQL, the other to the Realtime service',
+      'It\'s a redundancy pattern — if one fails, the other takes over',
+    ],
+    correct: 1,
+    explanation: 'The service_role key bypasses all RLS — the backend uses it when it needs to write data (after validating in application code). The user-scoped client passes the user\'s JWT so RLS filters results automatically. This is the two-client pattern: trust the backend for writes, trust the database for reads.',
+  },
+  {
+    category: 'Supabase',
+    text: 'Why must you NEVER expose the <code>SUPABASE_SERVICE_KEY</code> to the frontend?',
+    options: [
+      'It\'s too long to include in client-side bundles',
+      'It bypasses ALL Row Level Security — anyone with it can read/write/delete all data',
+      'It only works on the server\'s IP address',
+      'It expires every 24 hours and would break the frontend',
+    ],
+    correct: 1,
+    explanation: 'The service key is god-mode. It bypasses every RLS policy, every permission check. If it leaked to a browser, an attacker could SELECT * FROM profiles, delete all groups, read all messages. The frontend uses the anon key + user JWTs, which are constrained by RLS.',
+  },
+
+  // ─── RLS ───
+  {
+    category: 'Row Level Security',
+    text: 'With RLS enabled on a table and NO policies defined, what happens when a user queries it?',
+    options: [
+      'All rows are returned (open by default)',
+      'An error is thrown',
+      'Zero rows are returned (secure by default)',
+      'Only the user\'s own rows are returned',
+    ],
+    correct: 2,
+    explanation: 'RLS is deny-by-default. When enabled with no policies, it\'s as if every query has WHERE false appended. You must explicitly CREATE POLICY to grant access. This is a safe default — you can\'t accidentally forget to restrict access.',
+  },
+  {
+    category: 'Row Level Security',
+    text: 'How does a SELECT policy differ from an INSERT policy in PostgreSQL?',
+    options: [
+      'They work the same way — both filter existing rows',
+      'SELECT filters which existing rows you can see; INSERT validates whether the new row you\'re writing is allowed',
+      'SELECT uses USING; INSERT uses WHERE',
+      'INSERT policies don\'t exist — INSERT is always allowed if RLS is enabled',
+    ],
+    correct: 1,
+    explanation: 'You discovered this today! SELECT policies filter existing data (like a permanent WHERE clause). INSERT policies use WITH CHECK to validate the NEW row — e.g., "you can only insert invites where invited_by = your own ID." The row doesn\'t exist yet, so there\'s nothing to filter.',
+  },
+  {
+    category: 'Row Level Security',
+    text: 'In Broseph, Charlie (member of "College Bros" only) runs: <code>SELECT * FROM messages</code>. What does he see?',
+    options: [
+      'All messages across all groups',
+      'Only messages in "College Bros" (including system messages)',
+      'Only messages HE sent in "College Bros"',
+      'Nothing — messages require service_role to read',
+    ],
+    correct: 1,
+    explanation: 'The messages SELECT policy is: is_group_member(group_id). Charlie is in "College Bros" (g1), so he sees ALL messages in that group — including ones sent by Alice, Bob, and even system messages. He can\'t see "Work Chat" messages because he\'s not a member of g2.',
+  },
+  {
+    category: 'Row Level Security',
+    text: 'Why can\'t the RLS policy on <code>group_members</code> directly query <code>group_members</code> to check membership?',
+    options: [
+      'PostgreSQL doesn\'t allow self-referencing queries',
+      'It would cause infinite recursion — the policy checks the same table it\'s protecting',
+      'It would be too slow on large tables',
+      'Foreign keys prevent circular references',
+    ],
+    correct: 1,
+    explanation: 'If group_members\' RLS policy said "check if the user has a row in group_members", evaluating that check would trigger the SAME policy again — infinite loop! Broseph solves this with is_group_member() marked as SECURITY DEFINER, which bypasses RLS when executing.',
+  },
+
+  // ─── REST & HTTP ───
+  {
+    category: 'REST & HTTP',
+    text: 'Why does Broseph\'s "send message" endpoint return <code>HTTP 202 Accepted</code> instead of <code>201 Created</code>?',
+    options: [
+      '202 means the server understood the request but the message isn\'t created yet — it\'s queued for async processing',
+      '202 is the standard code for chat applications',
+      '201 is only for creating users',
+      '202 means the message was created but might be modified later',
+    ],
+    correct: 0,
+    explanation: 'Broseph uses the producer-consumer pattern: the API validates the request and adds a job to BullMQ, then immediately returns 202. The Worker picks up the job and actually inserts the message into Supabase. The client gets a fast response; the heavy work happens asynchronously.',
+  },
+  {
+    category: 'REST & HTTP',
+    text: 'Broseph\'s messages endpoint is <code>/api/groups/:groupId/messages</code>. Why nest messages under groups instead of using <code>/api/messages?groupId=...</code>?',
+    options: [
+      'Query parameters are slower than path parameters',
+      'Nested routes express the ownership relationship — messages belong to a group, and the URL makes that hierarchy explicit',
+      'NestJS doesn\'t support query parameters',
+      'It prevents SQL injection',
+    ],
+    correct: 1,
+    explanation: 'REST convention: if a resource belongs to a parent, nest it. The URL /api/groups/abc/messages clearly says "messages within group abc." It also means the guard/service can validate group membership from the URL path before touching the database.',
+  },
+
+  // ─── Node.js & pnpm ───
+  {
+    category: 'Node.js & pnpm',
+    text: 'Broseph uses a pnpm monorepo with workspaces. What does <code>pnpm --filter backend add zod</code> do?',
+    options: [
+      'Installs zod globally on the system',
+      'Adds zod only to the backend workspace\'s package.json, not the frontend',
+      'Filters out zod from the backend dependencies',
+      'Installs zod in every workspace that contains "backend" in its name',
+    ],
+    correct: 1,
+    explanation: 'The --filter flag targets a specific workspace in the monorepo. Broseph has "backend" and "frontend" workspaces. This installs zod as a dependency of backend only — the frontend\'s node_modules won\'t include it (unless it has its own dependency on it).',
+  },
+  {
+    category: 'Node.js & pnpm',
+    text: 'Why does Broseph use <code>pnpm</code> instead of <code>npm</code>?',
+    options: [
+      'pnpm is the only package manager that supports TypeScript',
+      'pnpm uses a content-addressable store and hard links — faster installs, less disk space, strict dependency isolation',
+      'npm doesn\'t support monorepos',
+      'pnpm is required by NestJS',
+    ],
+    correct: 1,
+    explanation: 'pnpm stores packages once globally and hard-links them into projects — so if 5 projects use React, it\'s stored once on disk. It also creates a strict node_modules structure that prevents accessing undeclared dependencies (phantom dependencies), catching bugs npm would miss.',
+  },
+
+  // ─── Database Migrations ───
+  {
+    category: 'Migrations',
+    text: 'Why does Broseph use numbered migration files instead of editing the database directly?',
+    options: [
+      'Supabase doesn\'t allow direct SQL execution',
+      'Migrations are versioned, reproducible, and can be applied consistently across local, staging, and production environments',
+      'Migration files are faster than direct SQL',
+      'It\'s a NestJS requirement',
+    ],
+    correct: 1,
+    explanation: 'Run "supabase db reset" and you get an identical database every time — every table, policy, index, trigger. Direct edits are forgotten, can\'t be shared, and can\'t be rolled back. Migrations are the source of truth for your schema, checked into git like any other code.',
+  },
+];
+
+// ── Shuffle helper ──
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ── State ──
+const quiz = shuffle(QUESTIONS);
+let current = 0;
+let selected = -1;
+let answered = false;
+let results = []; // { correct, category, text, userAnswer, correctAnswer }
+let timerStart = null;
+let timerInterval = null;
+const TOTAL_TIME = 20 * 60; // 20 minutes in seconds
+
+// ── App ──
+const app = document.getElementById('app');
+
+function renderStart() {
+  const categories = {};
+  quiz.forEach(q => { categories[q.category] = (categories[q.category] || 0) + 1; });
+
+  app.innerHTML = `
+    <div class="start-screen">
+      <h2><span>Study Review</span> Quiz</h2>
+      <p>${quiz.length} questions · 20 minutes · Based on your Broseph study plan</p>
+      <p style="color:#666;font-size:13px">Covers everything through Module 2 (plus today's RLS deep-dive)</p>
+      <div class="topic-chips">
+        ${Object.entries(categories).map(([cat, count]) =>
+          `<div class="topic-chip">${cat}<span class="count">×${count}</span></div>`
+        ).join('')}
+      </div>
+      <button class="btn btn-primary" style="font-size:16px;padding:14px 40px" onclick="startQuiz()">Start Quiz →</button>
+    </div>
+  `;
+}
+
+function startQuiz() {
+  timerStart = Date.now();
+  timerInterval = setInterval(updateTimer, 1000);
+  current = 0;
+  selected = -1;
+  answered = false;
+  results = [];
+  renderQuestion();
+}
+
+function updateTimer() {
+  const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+  const remaining = Math.max(0, TOTAL_TIME - elapsed);
+  const mins = Math.floor(remaining / 60);
+  const secs = remaining % 60;
+  const timerEl = document.querySelector('.timer');
+  if (timerEl) {
+    timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    if (remaining < 120) timerEl.classList.add('danger');
+    else timerEl.classList.remove('danger');
+  }
+  if (remaining <= 0) {
+    clearInterval(timerInterval);
+    finishQuiz();
+  }
+}
+
+function renderQuestion() {
+  const q = quiz[current];
+  const progress = ((current) / quiz.length) * 100;
+
+  app.innerHTML = `
+    <div class="quiz-header">
+      <div class="quiz-title"><span>Q${current + 1}</span> / ${quiz.length}</div>
+      <div class="timer">20:00</div>
+    </div>
+    <div>
+      <div class="progress-label">
+        <span>Question ${current + 1} of ${quiz.length}</span>
+        <span class="category">${q.category}</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${progress}%"></div></div>
+    </div>
+    <div class="question-card" id="qcard">
+      <div class="q-category">${q.category}</div>
+      <div class="q-text">${q.text}</div>
+      ${q.code ? `<div class="q-code">${q.code}</div>` : ''}
+      ${q.context ? `<div class="q-context">${q.context}</div>` : ''}
+      <div class="options" id="options">
+        ${q.options.map((opt, i) => `
+          <div class="option" data-idx="${i}" onclick="selectOption(${i})">
+            <div class="option-letter">${String.fromCharCode(65 + i)}</div>
+            <div class="option-text">${opt}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="feedback" id="feedback"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="next-btn" disabled onclick="submitAnswer()">Check Answer</button>
+      </div>
+    </div>
+  `;
+  updateTimer();
+}
+
+function selectOption(idx) {
+  if (answered) return;
+  selected = idx;
+  document.querySelectorAll('.option').forEach((opt, i) => {
+    opt.classList.toggle('selected', i === idx);
+  });
+  document.getElementById('next-btn').disabled = false;
+}
+
+function submitAnswer() {
+  const btn = document.getElementById('next-btn');
+
+  if (!answered) {
+    // Reveal answer
+    answered = true;
+    const q = quiz[current];
+    const isCorrect = selected === q.correct;
+
+    results.push({
+      correct: isCorrect,
+      category: q.category,
+      text: q.text,
+      userAnswer: q.options[selected],
+      correctAnswer: q.options[q.correct],
+    });
+
+    // Highlight options
+    document.querySelectorAll('.option').forEach((opt, i) => {
+      opt.classList.add('disabled');
+      if (i === q.correct) opt.classList.add('correct-answer');
+      if (i === selected && !isCorrect) opt.classList.add('wrong-answer');
+    });
+
+    // Show feedback
+    const fb = document.getElementById('feedback');
+    fb.className = `feedback show ${isCorrect ? 'correct' : 'wrong'}`;
+    fb.innerHTML = `
+      <strong>${isCorrect ? '✓ Correct!' : '✗ Not quite.'}</strong>
+      <div class="explanation">${q.explanation}</div>
+    `;
+
+    document.getElementById('qcard').classList.add(isCorrect ? 'correct' : 'wrong');
+    btn.textContent = current < quiz.length - 1 ? 'Next Question →' : 'See Results →';
+  } else {
+    // Move to next
+    current++;
+    selected = -1;
+    answered = false;
+    if (current < quiz.length) {
+      renderQuestion();
+    } else {
+      clearInterval(timerInterval);
+      finishQuiz();
+    }
+  }
+}
+
+function finishQuiz() {
+  const total = results.length;
+  const correct = results.filter(r => r.correct).length;
+  const pct = Math.round((correct / quiz.length) * 100);
+  const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+
+  // Category breakdown
+  const cats = {};
+  results.forEach(r => {
+    if (!cats[r.category]) cats[r.category] = { total: 0, correct: 0 };
+    cats[r.category].total++;
+    if (r.correct) cats[r.category].correct++;
+  });
+
+  // Missed questions
+  const missed = results.filter(r => !r.correct);
+
+  const scoreClass = pct >= 80 ? 'great' : pct >= 60 ? 'ok' : 'needs-work';
+  const message = pct >= 90 ? 'Outstanding! You\'re ready for the professor.' :
+                  pct >= 80 ? 'Strong understanding — a few areas to revisit.' :
+                  pct >= 60 ? 'Good foundation — review the missed topics below.' :
+                  'Keep studying — focus on the categories below.';
+
+  app.innerHTML = `
+    <div class="question-card">
+      <div class="score-screen">
+        <div class="q-category">Quiz Complete · ${mins}m ${secs}s</div>
+        <div class="score-big ${scoreClass}">${pct}%</div>
+        <div class="score-subtitle">${correct} of ${quiz.length} correct — ${message}</div>
+        <div class="score-breakdown">
+          ${Object.entries(cats).map(([cat, data]) => {
+            const catPct = Math.round((data.correct / data.total) * 100);
+            const cls = catPct === 100 ? 'perfect' : catPct >= 50 ? 'partial' : 'zero';
+            return `<div class="score-cat">
+              <div class="score-cat-name">${cat}</div>
+              <div class="score-cat-val ${cls}">${data.correct}/${data.total}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        ${missed.length > 0 ? `
+          <div class="q-category" style="margin-bottom:8px">Review These</div>
+          <div class="review-list">
+            ${missed.map(m => `
+              <div class="review-item">
+                <span class="review-icon">✗</span>
+                <div class="review-q">${m.text}<br>You answered: <strong>${m.userAnswer}</strong><br>Correct: <span style="color:var(--pass)">${m.correctAnswer}</span></div>
+              </div>
+            `).join('')}
+          </div>
+        ` : '<div style="color:var(--pass);font-size:16px;font-weight:600;margin-top:12px">🎉 Perfect score — no missed questions!</div>'}
+        <div class="btn-row" style="justify-content:center;margin-top:32px">
+          <button class="btn btn-secondary" onclick="renderStart()">Back to Start</button>
+          <button class="btn btn-primary" onclick="startQuiz()">Retake Quiz</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.key >= '1' && e.key <= '4') selectOption(parseInt(e.key) - 1);
+  if (e.key === 'a' || e.key === 'A') selectOption(0);
+  if (e.key === 'b' || e.key === 'B') selectOption(1);
+  if (e.key === 'c' || e.key === 'C') selectOption(2);
+  if (e.key === 'd' || e.key === 'D') selectOption(3);
+  if (e.key === 'Enter') {
+    const btn = document.getElementById('next-btn');
+    if (btn && !btn.disabled) btn.click();
+  }
+});
+
+// ── Init ──
+renderStart();
+</script>
+</body>
+</html>

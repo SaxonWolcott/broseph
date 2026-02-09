@@ -3,6 +3,7 @@ import { Spinner, Button } from '@heroui/react';
 import { InfiniteData } from '@tanstack/react-query';
 import { MessageListResponse, Message } from '../../types/messages';
 import { MessageBubble } from './MessageBubble';
+import { SystemMessage } from './SystemMessage';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface MessageListProps {
@@ -106,11 +107,30 @@ export function MessageList({
       <div className="flex flex-col gap-2">
         {messages.map((message, index) => {
           const prevMessage = index > 0 ? messages[index - 1] : null;
+          const isSystem = message.type === 'system';
           const showDateSeparator =
             !prevMessage || !isSameDay(message.createdAt, prevMessage.createdAt);
+
+          if (isSystem) {
+            return (
+              <div key={message.id}>
+                {showDateSeparator && (
+                  <div className="flex justify-center py-2">
+                    <span className="text-xs text-default-400 bg-default-100 px-3 py-1 rounded-full">
+                      {formatDateSeparator(message.createdAt)}
+                    </span>
+                  </div>
+                )}
+                <SystemMessage message={message} />
+              </div>
+            );
+          }
+
+          const prevNonSystem =
+            prevMessage && prevMessage.type !== 'system' ? prevMessage : null;
           const showAvatar =
-            !prevMessage ||
-            prevMessage.sender.id !== message.sender.id ||
+            !prevNonSystem ||
+            prevNonSystem.sender?.id !== message.sender?.id ||
             showDateSeparator;
 
           return (
@@ -124,7 +144,7 @@ export function MessageList({
               )}
               <MessageBubble
                 message={message}
-                isOwn={message.sender.id === user?.id}
+                isOwn={message.sender?.id === user?.id}
                 showAvatar={showAvatar}
               />
             </div>

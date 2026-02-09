@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NestJS Request Lifecycle — Broseph</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#111;color:#e0e0e0;height:100vh;display:flex;overflow:hidden}
+  :root{--mono:'SF Mono','Cascadia Code','Consolas',monospace;--accent:#61afef;--pass:#98c379;--fail:#e06c75;--warn:#e5c07b;--purple:#c678dd}
+
+  .controls{width:340px;min-width:340px;background:#1a1a1a;border-right:1px solid #333;display:flex;flex-direction:column}
+  .controls-header{padding:20px 20px 0}
+  .controls h1{font-size:18px;font-weight:700;color:#fff}
+  .controls h1 span{color:var(--accent)}
+  .controls-scroll{flex:1;overflow-y:auto;padding:16px 20px 20px;display:flex;flex-direction:column;gap:16px}
+  .group-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#666;margin-bottom:4px}
+  .control-group{display:flex;flex-direction:column;gap:8px}
+
+  /* Route cards */
+  .route-cards{display:flex;flex-direction:column;gap:4px}
+  .route-card{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#222;border:1px solid #333;border-radius:6px;cursor:pointer;transition:all 0.15s}
+  .route-card:hover{border-color:#555}
+  .route-card.active{border-color:var(--accent);background:#1a2a3a}
+  .method-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;font-family:var(--mono);min-width:44px;text-align:center}
+  .method-GET{background:#98c37922;color:#98c379}
+  .method-POST{background:#61afef22;color:#61afef}
+  .method-DELETE{background:#e06c7522;color:#e06c75}
+  .route-path{font-family:var(--mono);font-size:12px;color:#ccc;flex:1}
+  .route-tag{font-size:10px;color:#555;font-family:var(--mono)}
+
+  /* Scenario toggles */
+  .scenario-cards{display:flex;flex-direction:column;gap:4px}
+  .scenario-card{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#222;border:1px solid #333;border-radius:6px;cursor:pointer;transition:all 0.15s}
+  .scenario-card:hover{border-color:#555}
+  .scenario-card.active{border-color:var(--warn);background:#2a2a1a}
+  .scenario-icon{font-size:16px;width:24px;text-align:center}
+  .scenario-label{font-size:12px;color:#ccc;flex:1}
+  .scenario-desc{font-size:10px;color:#666}
+
+  /* Speed */
+  .speed-row{display:flex;align-items:center;gap:10px}
+  .speed-row label{font-size:12px;color:#999;flex-shrink:0}
+  .speed-row input{flex:1}
+  input[type="range"]{-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;background:#333;outline:none;cursor:pointer}
+  input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer}
+
+  .play-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:all 0.15s;width:100%}
+  .play-btn:hover{filter:brightness(1.15)}
+  .play-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+  /* Main */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .preview-area{flex:1;padding:24px 32px;overflow:auto;display:flex;flex-direction:column;gap:0}
+
+  /* Pipeline */
+  .pipeline{display:flex;flex-direction:column;gap:0;position:relative}
+
+  .stage{display:flex;align-items:stretch;gap:0;min-height:64px;position:relative;opacity:0.3;transition:all 0.4s}
+  .stage.reached{opacity:1}
+  .stage.current{opacity:1}
+  .stage.failed .stage-box{border-color:var(--fail);background:rgba(224,108,117,0.06)}
+  .stage.passed .stage-box{border-color:var(--pass);background:rgba(152,195,121,0.04)}
+
+  .stage-line{width:40px;display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+  .stage-dot{width:14px;height:14px;border-radius:50%;background:#333;border:2px solid #444;z-index:1;transition:all 0.3s;flex-shrink:0;margin-top:20px}
+  .stage.reached .stage-dot{background:#444;border-color:#666}
+  .stage.current .stage-dot{background:var(--accent);border-color:var(--accent);box-shadow:0 0 12px rgba(97,175,239,0.4)}
+  .stage.passed .stage-dot{background:var(--pass);border-color:var(--pass)}
+  .stage.failed .stage-dot{background:var(--fail);border-color:var(--fail)}
+  .stage-connector{flex:1;width:2px;background:#333;margin-top:2px}
+  .stage.reached .stage-connector{background:#444}
+  .stage.passed .stage-connector{background:var(--pass)44}
+
+  .stage-box{flex:1;border:1px solid #333;border-radius:8px;padding:12px 16px;background:#1a1a2e;transition:all 0.3s;margin:4px 0}
+
+  .stage-header{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .stage-name{font-size:13px;font-weight:600;color:#eee}
+  .stage-type{font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;font-family:var(--mono)}
+  .type-middleware{background:#c678dd22;color:#c678dd}
+  .type-guard{background:#e5c07b22;color:#e5c07b}
+  .type-pipe{background:#61afef22;color:#61afef}
+  .type-handler{background:#98c37922;color:#98c379}
+  .type-queue{background:#e06c7522;color:#56b6c2}
+  .type-response{background:#e5c07b22;color:#e5c07b}
+
+  .stage-desc{font-size:11px;color:#888;line-height:1.5}
+  .stage-detail{font-size:11px;font-family:var(--mono);color:#666;margin-top:4px;background:#181828;padding:6px 8px;border-radius:4px}
+  .stage.current .stage-detail{color:var(--accent)}
+
+  .stage-result{font-size:11px;font-weight:600;margin-top:6px;display:flex;align-items:center;gap:6px}
+  .result-pass{color:var(--pass)}
+  .result-fail{color:var(--fail)}
+
+  /* Bottom panel */
+  .bottom-panel{border-top:1px solid #333;background:#1a1a1a;padding:14px 20px}
+  .bottom-text{font-size:13px;line-height:1.6;color:#ccc}
+  .bottom-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#666;margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <div class="controls-header"><h1><span>NestJS</span> Lifecycle</h1></div>
+  <div class="controls-scroll">
+    <div class="control-group">
+      <div class="group-label">Select Route</div>
+      <div class="route-cards" id="route-cards"></div>
+    </div>
+    <div class="control-group">
+      <div class="group-label">Scenario</div>
+      <div class="scenario-cards" id="scenarios"></div>
+    </div>
+    <div class="control-group">
+      <div class="group-label">Animation Speed</div>
+      <div class="speed-row">
+        <label>Slow</label>
+        <input type="range" id="speed" min="200" max="1500" value="700">
+        <label>Fast</label>
+      </div>
+    </div>
+    <button class="play-btn" id="play-btn">▶ Run Request</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="preview-area">
+    <div class="pipeline" id="pipeline"></div>
+  </div>
+  <div class="bottom-panel">
+    <div class="bottom-label">What's happening</div>
+    <div class="bottom-text" id="narration">Select a route and click "Run Request" to watch the lifecycle animate.</div>
+  </div>
+</div>
+
+<script>
+// ── Route definitions (from actual Broseph API) ──
+const ROUTES = [
+  { method:'GET',    path:'/api/health',                     controller:'HealthController',   guarded:false, queued:false, tag:'public' },
+  { method:'GET',    path:'/api/auth/me',                    controller:'AuthController',     guarded:true,  queued:false, tag:'auth' },
+  { method:'POST',   path:'/api/auth/magic-link',            controller:'AuthController',     guarded:false, queued:false, tag:'public' },
+  { method:'POST',   path:'/api/groups',                     controller:'GroupsController',   guarded:true,  queued:true,  tag:'queued' },
+  { method:'GET',    path:'/api/groups',                     controller:'GroupsController',   guarded:true,  queued:false, tag:'auth' },
+  { method:'POST',   path:'/api/groups/:gid/messages',       controller:'MessagesController', guarded:true,  queued:true,  tag:'queued' },
+  { method:'GET',    path:'/api/groups/:gid/messages',       controller:'MessagesController', guarded:true,  queued:false, tag:'auth' },
+  { method:'POST',   path:'/api/invites/:token/accept',      controller:'InvitesController',  guarded:true,  queued:true,  tag:'queued' },
+  { method:'GET',    path:'/api/invites/:token',             controller:'InvitesController',  guarded:false, queued:false, tag:'public' },
+  { method:'DELETE', path:'/api/groups/:gid/members/me',     controller:'MembersController',  guarded:true,  queued:true,  tag:'queued' },
+];
+
+const SCENARIOS = [
+  { id:'happy',    icon:'✓', label:'Happy path',         desc:'Valid token, valid data' },
+  { id:'no-token', icon:'🔒', label:'Missing auth token', desc:'No Authorization header' },
+  { id:'bad-body', icon:'⚠', label:'Invalid request body', desc:'Fails DTO validation' },
+  { id:'forbidden',icon:'🚫', label:'Not a group member',  desc:'Service rejects permission' },
+];
+
+const state = { routeIdx: 3, scenario: 'happy', playing: false };
+
+// ── Build route cards ──
+const routeCardsEl = document.getElementById('route-cards');
+ROUTES.forEach((r, i) => {
+  const card = document.createElement('div');
+  card.className = 'route-card';
+  card.dataset.idx = i;
+  card.innerHTML = `
+    <span class="method-badge method-${r.method}">${r.method}</span>
+    <span class="route-path">${r.path}</span>
+    <span class="route-tag">${r.tag}</span>
+  `;
+  card.addEventListener('click', () => { state.routeIdx = i; resetPipeline(); updateControls(); });
+  routeCardsEl.appendChild(card);
+});
+
+// ── Build scenarios ──
+const scenariosEl = document.getElementById('scenarios');
+SCENARIOS.forEach(s => {
+  const card = document.createElement('div');
+  card.className = 'scenario-card';
+  card.dataset.id = s.id;
+  card.innerHTML = `
+    <span class="scenario-icon">${s.icon}</span>
+    <div>
+      <div class="scenario-label">${s.label}</div>
+      <div class="scenario-desc">${s.desc}</div>
+    </div>
+  `;
+  card.addEventListener('click', () => { state.scenario = s.id; resetPipeline(); updateControls(); });
+  scenariosEl.appendChild(card);
+});
+
+function updateControls() {
+  routeCardsEl.querySelectorAll('.route-card').forEach((c, i) => c.classList.toggle('active', i === state.routeIdx));
+  scenariosEl.querySelectorAll('.scenario-card').forEach(c => c.classList.toggle('active', c.dataset.id === state.scenario));
+}
+
+// ── Build pipeline stages ──
+function buildStages() {
+  const route = ROUTES[state.routeIdx];
+  const sc = state.scenario;
+  const stages = [];
+
+  // 1. CORS
+  stages.push({
+    name: 'CORS Middleware', type: 'middleware', typeClass: 'type-middleware',
+    desc: 'Checks Origin header against allowed origins.',
+    detail: `origin: http://localhost:5173 → allowed: true`,
+    pass: true, failOn: null,
+    narration: 'The request hits the global CORS middleware first. Broseph allows requests from localhost:5173 (the Vite dev server) with credentials.',
+  });
+
+  // 2. Route matching
+  stages.push({
+    name: 'Route Matching', type: 'router', typeClass: 'type-middleware',
+    desc: `Match ${route.method} ${route.path} → ${route.controller}`,
+    detail: `@${route.method === 'GET' ? 'Get' : route.method === 'POST' ? 'Post' : 'Delete'}('${route.path.split('/').pop()}')`,
+    pass: true, failOn: null,
+    narration: `NestJS matches the ${route.method} request to ${route.controller}. The path is resolved through the module's controller registration.`,
+  });
+
+  // 3. Guard (if protected)
+  if (route.guarded) {
+    const guardPass = sc !== 'no-token';
+    stages.push({
+      name: 'SupabaseAuthGuard', type: 'guard', typeClass: 'type-guard',
+      desc: guardPass
+        ? 'Extracts Bearer token → validates with Supabase → attaches user to request.'
+        : 'No Authorization header found. Request rejected.',
+      detail: guardPass
+        ? `token: eyJhbG...abc → supabase.auth.getUser() → ✓ user.id = "u1"`
+        : `Authorization header: missing → throw UnauthorizedException`,
+      pass: guardPass,
+      failOn: 'no-token',
+      narration: guardPass
+        ? 'The SupabaseAuthGuard extracts the JWT from the Authorization header, calls supabase.auth.getUser() to validate it, then attaches the user object and access token to the request. This is how @CurrentUser() gets its data.'
+        : 'No Bearer token in the Authorization header! The guard throws UnauthorizedException (HTTP 401). The request never reaches the handler. This is the security boundary — everything after this point can trust the user identity.',
+    });
+  }
+
+  // 4. ValidationPipe (for POST/PUT with body)
+  if (route.method === 'POST') {
+    const pipePass = sc !== 'bad-body' || !route.guarded || sc === 'no-token';
+    const actuallyRuns = route.guarded ? sc !== 'no-token' : true;
+    if (actuallyRuns) {
+      stages.push({
+        name: 'Global ValidationPipe', type: 'pipe', typeClass: 'type-pipe',
+        desc: pipePass
+          ? 'Transforms request body → DTO class. Validates constraints. Strips unknown fields.'
+          : 'Request body failed validation. Unknown properties or missing required fields.',
+        detail: pipePass
+          ? `whitelist: true, transform: true → body validated as DTO ✓`
+          : `BadRequestException: "name must be 1-50 characters"`,
+        pass: pipePass || sc !== 'bad-body',
+        failOn: 'bad-body',
+        narration: pipePass
+          ? 'The global ValidationPipe (configured in main.ts) auto-transforms the raw JSON body into a typed DTO class. whitelist:true strips any extra properties an attacker might inject. forbidNonWhitelisted:true rejects them outright. This is your input sanitization layer.'
+          : 'The ValidationPipe caught invalid data! The DTO class has decorators like @IsString(), @Length(1, 50) — the pipe runs these checks and throws BadRequestException (HTTP 400) with details about which fields failed. The handler never executes.',
+      });
+    }
+  }
+
+  // 5. Parameter decorators
+  const reachedHandler = !(route.guarded && sc === 'no-token') && !(route.method === 'POST' && sc === 'bad-body');
+  if (reachedHandler && route.guarded) {
+    stages.push({
+      name: '@CurrentUser() + @AccessToken()', type: 'pipe', typeClass: 'type-pipe',
+      desc: 'Custom parameter decorators extract user and token from the request object.',
+      detail: `@CurrentUser() → user { id: "u1", email: "alice@..." }\n@AccessToken() → "eyJhbG...abc"`,
+      pass: true, failOn: null,
+      narration: '@CurrentUser() is a custom decorator created with createParamDecorator(). It reads request.user (set by the guard). The handler receives a typed User object without knowing anything about HTTP headers or JWTs — clean separation of concerns.',
+    });
+  }
+
+  // 6. Handler
+  if (reachedHandler) {
+    const handlerPass = sc !== 'forbidden';
+    if (route.queued) {
+      stages.push({
+        name: `${route.controller} Handler`, type: 'handler', typeClass: 'type-handler',
+        desc: handlerPass
+          ? 'Validates permissions via service, then adds job to BullMQ queue.'
+          : 'Service-level permission check failed. User is not authorized.',
+        detail: handlerPass
+          ? `service.validate() → ✓ → queue.add('${route.tag === 'queued' ? route.path.includes('message') ? 'send-message' : route.path.includes('accept') ? 'accept-invite' : route.path.includes('members') ? 'leave-group' : 'create-group' : 'job'}', data)`
+          : `ForbiddenException: "Not a member of this group"`,
+        pass: handlerPass, failOn: 'forbidden',
+        narration: handlerPass
+          ? `The controller delegates to the service, which first checks permissions (e.g., is this user a member of the group?). If valid, it adds a job to BullMQ rather than doing the work inline. This returns HTTP 202 immediately — the user doesn't wait for the DB write.`
+          : `The service checks whether the user has permission (e.g., is_group_member). They're not a member, so it throws ForbiddenException (HTTP 403). Even though auth passed, business logic rejected the request. This is the difference between authentication (who are you?) and authorization (are you allowed?).`,
+      });
+    } else {
+      stages.push({
+        name: `${route.controller} Handler`, type: 'handler', typeClass: 'type-handler',
+        desc: handlerPass
+          ? 'Executes business logic directly — queries Supabase and returns data.'
+          : 'Service-level permission check failed.',
+        detail: handlerPass
+          ? `supabase.from('${route.path.includes('message') ? 'messages' : route.path.includes('group') ? 'groups' : route.path.includes('invite') ? 'group_invites' : 'profiles'}').select() → data[]`
+          : `ForbiddenException: "Not a member of this group"`,
+        pass: handlerPass, failOn: 'forbidden',
+        narration: handlerPass
+          ? `The handler calls the service, which queries Supabase using the user's access token. RLS policies on the database act as a second layer of security — even if the API had a bug, the database wouldn't return unauthorized rows.`
+          : `The service rejects the request. The controller returns HTTP 403 Forbidden. Defense in depth: even if this check was missing, RLS on the database would block the query.`,
+      });
+    }
+  }
+
+  // 7. Queue (if applicable)
+  if (reachedHandler && route.queued && sc !== 'forbidden') {
+    stages.push({
+      name: 'BullMQ → Worker', type: 'queue', typeClass: 'type-queue',
+      desc: 'Job added to Redis queue. Worker picks it up asynchronously.',
+      detail: `Queue: "broseph-jobs" → Worker processes with service_role (bypasses RLS)`,
+      pass: true, failOn: null,
+      narration: 'The job is now in Redis. The separate Worker app (a different NestJS process) picks it up and executes it using the service_role key — which bypasses RLS. This is why writes go through the API→Queue→Worker pipeline: the Worker is trusted to enforce business rules before writing.',
+    });
+  }
+
+  // 8. Response
+  const finalPass = reachedHandler && sc !== 'forbidden';
+  stages.push({
+    name: 'HTTP Response', type: 'response', typeClass: 'type-response',
+    desc: !reachedHandler
+      ? (sc === 'no-token' ? '401 Unauthorized' : '400 Bad Request')
+      : (sc === 'forbidden' ? '403 Forbidden' : route.queued ? '202 Accepted — { jobId, status: "queued" }' : '200 OK — data returned'),
+    detail: !reachedHandler
+      ? `{ statusCode: ${sc === 'no-token' ? 401 : 400}, message: "${sc === 'no-token' ? 'Unauthorized' : 'Bad Request'}" }`
+      : (sc === 'forbidden'
+        ? `{ statusCode: 403, message: "Forbidden" }`
+        : route.queued
+          ? `{ jobId: "abc-123", status: "queued" }`
+          : `{ data: [...] }`),
+    pass: finalPass, failOn: null,
+    narration: finalPass
+      ? (route.queued
+        ? 'HTTP 202 Accepted — the client knows the job was queued. The frontend can optimistically update the UI while the Worker processes in the background. This is the producer-consumer pattern.'
+        : 'HTTP 200 OK — data is serialized to JSON and sent back. The entire lifecycle completed successfully: CORS → Guard → Validation → Handler → Response.')
+      : `The request was rejected at the ${sc === 'no-token' ? 'guard' : sc === 'bad-body' ? 'validation' : 'handler'} stage. NestJS catches the exception and formats it as a standard error response with the appropriate HTTP status code.`,
+  });
+
+  return stages;
+}
+
+// ── Render pipeline ──
+const pipelineEl = document.getElementById('pipeline');
+let currentStages = [];
+
+function resetPipeline() {
+  currentStages = buildStages();
+  renderPipeline();
+  document.getElementById('narration').textContent = 'Select a route and click "Run Request" to watch the lifecycle animate.';
+}
+
+function renderPipeline(activeIdx = -1) {
+  pipelineEl.innerHTML = '';
+  currentStages.forEach((stage, i) => {
+    const el = document.createElement('div');
+    el.className = 'stage';
+    if (i < activeIdx) el.classList.add('reached', stage.pass ? 'passed' : 'failed');
+    if (i === activeIdx) el.classList.add('reached', 'current');
+
+    const resultHtml = i <= activeIdx
+      ? `<div class="stage-result ${stage.pass ? 'result-pass' : 'result-fail'}">${stage.pass ? '✓ Passed' : '✗ ' + (stage.failOn === 'no-token' ? 'HTTP 401 Unauthorized' : stage.failOn === 'bad-body' ? 'HTTP 400 Bad Request' : stage.failOn === 'forbidden' ? 'HTTP 403 Forbidden' : 'Failed')}</div>`
+      : '';
+
+    el.innerHTML = `
+      <div class="stage-line">
+        <div class="stage-dot"></div>
+        ${i < currentStages.length - 1 ? '<div class="stage-connector"></div>' : ''}
+      </div>
+      <div class="stage-box">
+        <div class="stage-header">
+          <span class="stage-name">${stage.name}</span>
+          <span class="stage-type ${stage.typeClass}">${stage.type}</span>
+        </div>
+        <div class="stage-desc">${stage.desc}</div>
+        ${i <= activeIdx ? `<div class="stage-detail">${stage.detail}</div>` : ''}
+        ${resultHtml}
+      </div>
+    `;
+    pipelineEl.appendChild(el);
+  });
+}
+
+// ── Animation ──
+document.getElementById('play-btn').addEventListener('click', async () => {
+  if (state.playing) return;
+  state.playing = true;
+  const btn = document.getElementById('play-btn');
+  btn.disabled = true;
+  btn.textContent = '● Running...';
+
+  currentStages = buildStages();
+  const speed = 1700 - parseInt(document.getElementById('speed').value);
+
+  for (let i = 0; i < currentStages.length; i++) {
+    renderPipeline(i);
+    document.getElementById('narration').textContent = currentStages[i].narration;
+
+    // Scroll current stage into view
+    const stageEls = pipelineEl.querySelectorAll('.stage');
+    if (stageEls[i]) stageEls[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    await new Promise(r => setTimeout(r, speed));
+
+    if (!currentStages[i].pass) {
+      // Animate to the response (last stage)
+      await new Promise(r => setTimeout(r, speed / 2));
+      renderPipeline(currentStages.length - 1);
+      document.getElementById('narration').textContent = currentStages[currentStages.length - 1].narration;
+      break;
+    }
+  }
+
+  state.playing = false;
+  btn.disabled = false;
+  btn.textContent = '▶ Run Request';
+});
+
+// ── Init ──
+updateControls();
+resetPipeline();
+</script>
+</body>
+</html>
