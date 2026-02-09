@@ -4,39 +4,37 @@ High-level tracking of completed and planned work for Broseph - a group messagin
 
 ## Completed Milestones
 
-- **Milestone 001: Project Bootstrap** - Completed
-  - Set up pnpm monorepo with NestJS backend and React frontend
-  - Configured Supabase database with initial schema
-  - Created 11 specialized Claude Code subagents
-  - See: `/milestones/001-project-bootstrap.md`
+- **001: Project Bootstrap** — pnpm monorepo, NestJS backend, React frontend, Supabase DB, Claude subagents
+- **002: Initial Auth Setup** — Supabase Auth with magic links, JWT validation
+- **003: MVP Group Messaging** — Groups, messages, BullMQ job queue, real-time chat
+- **004: Fix Invite Links** — Token-based group invites
+- **005: Realtime Updates** — Supabase Realtime for messages and members
+- **006: Display Name Signup** — Display name flow during registration
+- **007: Email Invitations** — Email-based invite links
+- **008: Split Sign-in / Login / Signup** — Separate auth pages for sign-in vs signup
+- **009: Profile Icon & Groups Menu** — User profile UI, group management
+- **010: Fix Invite Flow Race Condition** — Stabilized invite acceptance
+- **011: Prompts Feature Phase 1** — Daily conversation prompts, realtime feed, type safety
+- **012: Comprehensive README** — Full project documentation for independent study review
+
+See `/milestones/` for detailed retrospectives on each.
 
 ## Upcoming Work
 
-The following features are planned for future development:
-
-### Phase 1: Core Messaging
-- [ ] User authentication with Supabase Auth
-- [ ] Group creation and management
-- [ ] Real-time messaging with Supabase Realtime
-- [ ] Mobile-optimized chat UI
-
-### Phase 2: Engagement Features
-- [ ] AI-powered daily conversation prompts
-- [ ] Prompt response collection and display
+### Engagement Features
+- [ ] Rework conversation prompts system
 - [ ] Push notifications for new messages
 - [ ] Engagement reminders
 
-### Phase 3: Social Features
-- [ ] User profiles and avatars
-- [ ] Friend discovery and invitations
+### Social Features
 - [ ] Group activity feed
 - [ ] Reaction and emoji support
 
-### Phase 4: Platform Expansion
+### Platform Expansion
 - [ ] iOS native app
 - [ ] Android native app
 - [ ] Web PWA enhancements
 
 ---
 
-*Last updated: 2026-02-04*
+*Last updated: 2026-02-09*
