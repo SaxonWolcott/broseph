@@ -329,7 +329,8 @@ export class InvitesService {
 
   /**
    * Send a magic link to the invite's email for one-click join.
-   * Uses Supabase magic link which will redirect to auth callback with invite token.
+   * Uses generateLink + custom branded email (never Supabase's default template).
+   * Works for both existing and new users (generateLink creates users automatically).
    */
   async sendMagicLinkForInvite(token: string): Promise<SendMagicLinkResult> {
     const adminClient = this.supabaseService.getAdminClient();
@@ -364,18 +365,50 @@ export class InvitesService {
       'SITE_URL',
       'http://localhost:5173',
     );
-    const redirectTo = `${siteUrl}/auth/callback?autoAcceptInvite=${token}`;
+    const callbackUrl = `${siteUrl}/auth/callback?autoAcceptInvite=${token}`;
 
-    // Send magic link via Supabase - this authenticates AND auto-joins via the redirect
-    const { error: authError } = await adminClient.auth.signInWithOtp({
-      email: invite.email,
-      options: {
-        emailRedirectTo: redirectTo,
-      },
-    });
+    // Generate magic link without sending Supabase's default email
+    // generateLink with type 'magiclink' creates the user if they don't exist
+    const { data: linkData, error: linkError } =
+      await adminClient.auth.admin.generateLink({
+        type: 'magiclink',
+        email: invite.email,
+        options: { redirectTo: callbackUrl },
+      });
 
-    if (authError) {
-      console.error('Failed to send magic link for invite:', authError.message);
+    if (linkError || !linkData?.properties?.action_link) {
+      console.error('Failed to generate magic link for invite:', linkError?.message);
+      throw new BadRequestException('Failed to send sign-in link');
+    }
+
+    // Fetch group name and inviter name for the email
+    const { data: groupData } = await adminClient
+      .from('groups')
+      .select('name')
+      .eq('id', invite.group_id)
+      .single();
+
+    const { data: inviterProfile } = await adminClient
+      .from('group_invites')
+      .select('profiles:invited_by (display_name)')
+      .eq('id', invite.id)
+      .single();
+
+    const groupName = groupData?.name ?? 'a group';
+    const inviterName =
+      (inviterProfile?.profiles as unknown as { display_name: string | null })
+        ?.display_name ?? 'Someone';
+
+    // Send our custom branded invite email
+    try {
+      await this.emailService.sendInviteEmail({
+        to: invite.email,
+        groupName,
+        inviterName,
+        inviteLink: linkData.properties.action_link,
+      });
+    } catch (emailError) {
+      console.error('Failed to send invite magic link email:', emailError);
       throw new BadRequestException('Failed to send sign-in link');
     }
 

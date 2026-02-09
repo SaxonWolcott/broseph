@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { useInvitePreview } from '../hooks/useInvitePreview';
 import { useAcceptInvite } from '../hooks/useAcceptInvite';
-import { useCheckInviteAccount } from '../hooks/useCheckInviteAccount';
 import { useSendInviteMagicLink } from '../hooks/useSendInviteMagicLink';
 
 export default function InvitePage() {
@@ -13,7 +12,6 @@ export default function InvitePage() {
   const navigate = useNavigate();
   const { session, loading: authLoading } = useAuth();
   const { data: invite, isLoading: inviteLoading, error } = useInvitePreview(token);
-  const { data: accountCheck, isLoading: accountLoading } = useCheckInviteAccount(token);
   const acceptInvite = useAcceptInvite();
   const sendMagicLink = useSendInviteMagicLink();
 
@@ -48,9 +46,11 @@ export default function InvitePage() {
     }
   }, [session, authLoading, invite, inviteLoading, token, navigate, acceptInvite]);
 
-  // Auto-send magic link for existing users, or redirect to signup for new users
+  // Auto-send magic link for unauthenticated users (both existing and new)
+  // For new users, the backend creates their account automatically via generateLink.
+  // After clicking the magic link, new users are taken to the display name screen.
   useEffect(() => {
-    if (authLoading || inviteLoading || accountLoading || !invite || !token || !accountCheck) return;
+    if (authLoading || inviteLoading || !invite || !token) return;
     if (session) return; // Already handled above
     if (autoActionTriggered.current) return;
 
@@ -59,25 +59,18 @@ export default function InvitePage() {
 
     autoActionTriggered.current = true;
 
-    if (accountCheck.hasAccount) {
-      // Existing user - auto-send magic link
-      sendMagicLink.mutateAsync(token)
-        .then((result) => {
-          setMagicLinkSent(true);
-          setSentToEmail(result.email);
-        })
-        .catch((err) => {
-          autoActionTriggered.current = false;
-          toast.error(err.message || 'Failed to send sign-in link');
-        });
-    } else {
-      // New user - redirect to signup with invite token stored
-      localStorage.setItem('pendingInviteAccept', token);
-      navigate('/signup', { replace: true });
-    }
-  }, [session, authLoading, invite, inviteLoading, accountCheck, accountLoading, token, navigate, sendMagicLink]);
+    sendMagicLink.mutateAsync(token)
+      .then((result) => {
+        setMagicLinkSent(true);
+        setSentToEmail(result.email);
+      })
+      .catch((err) => {
+        autoActionTriggered.current = false;
+        toast.error(err.message || 'Failed to send sign-in link');
+      });
+  }, [session, authLoading, invite, inviteLoading, token, sendMagicLink]);
 
-  const isLoading = inviteLoading || authLoading || accountLoading;
+  const isLoading = inviteLoading || authLoading;
 
   if (isLoading || autoJoining) {
     return (

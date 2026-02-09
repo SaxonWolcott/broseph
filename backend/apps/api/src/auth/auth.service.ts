@@ -24,6 +24,7 @@ export class AuthService {
 
   /**
    * Send a magic link email to the specified address.
+   * Uses generateLink + custom branded email (never Supabase's default template).
    * Does not leak whether the email exists in the system.
    */
   async sendMagicLink(dto: MagicLinkRequestDto): Promise<void> {
@@ -45,16 +46,30 @@ export class AuthService {
       throw new BadRequestException('Invalid redirect URL');
     }
 
-    const { error } = await adminClient.auth.signInWithOtp({
+    // Generate magic link without sending Supabase's default email
+    const { data, error } = await adminClient.auth.admin.generateLink({
+      type: 'magiclink',
       email: dto.email,
       options: {
-        emailRedirectTo: redirectTo,
+        redirectTo: redirectTo,
       },
     });
 
-    if (error) {
-      // Log the error but don't expose details to client
-      console.error('Magic link error:', error.message);
+    if (error || !data?.properties?.action_link) {
+      console.error('Generate link error:', error?.message);
+      throw new BadRequestException(
+        'Unable to send magic link. Please try again.',
+      );
+    }
+
+    // Send our custom branded login email
+    try {
+      await this.emailService.sendLoginEmail({
+        to: dto.email,
+        magicLink: data.properties.action_link,
+      });
+    } catch (emailError) {
+      console.error('Failed to send login email:', emailError);
       throw new BadRequestException(
         'Unable to send magic link. Please try again.',
       );
