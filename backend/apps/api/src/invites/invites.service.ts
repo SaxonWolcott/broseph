@@ -117,15 +117,30 @@ export class InvitesService {
     const groupName = groupData?.name ?? 'a group';
     const inviterName = inviterData?.display_name ?? 'Someone';
 
-    // Build invite link that goes to the invite preview page
+    // Build invite link — try to generate a Supabase magic link so the user
+    // is authenticated in one click (no second email needed).
     const siteUrl = this.configService.get<string>(
       'SITE_URL',
       'http://localhost:5173',
     );
-    const inviteLink = `${siteUrl}/invite/${token}`;
+    const adminClient = this.supabaseService.getAdminClient();
+    const callbackUrl = `${siteUrl}/auth/callback?autoAcceptInvite=${token}`;
+    const { data: linkData, error: linkError } =
+      await adminClient.auth.admin.generateLink({
+        type: 'magiclink',
+        email,
+        options: { redirectTo: callbackUrl },
+      });
+    if (linkError) {
+      console.warn(
+        'Failed to generate magic link, falling back to invite page:',
+        linkError.message,
+      );
+    }
+    const inviteLink =
+      linkData?.properties?.action_link ?? `${siteUrl}/invite/${token}`;
 
     // Send custom invite email with proper branding
-    // The user clicks the link, sees the invite preview, then logs in/signs up to join
     try {
       console.log(`Sending invite email to ${email} for group "${groupName}"...`);
       await this.emailService.sendInviteEmail({

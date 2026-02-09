@@ -72,6 +72,15 @@ export class OnboardDto {
     message: 'Handle can only contain letters, numbers, and underscores',
   })
   handle?: string;
+
+  @ApiPropertyOptional({
+    example: 'https://example.com/avatars/user123/avatar.jpg',
+    description: 'URL to the user avatar image',
+  })
+  @IsOptional()
+  @IsString()
+  @IsUrl({ require_tld: false })
+  avatarUrl?: string;
 }
 
 export class CheckEmailDto {

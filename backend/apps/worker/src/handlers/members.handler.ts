@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { SupabaseService, LeaveGroupJobDto, AcceptInviteJobDto, LIMITS } from '@app/shared';
+import { SupabaseService, LeaveGroupJobDto, AcceptInviteJobDto, LIMITS, generateId } from '@app/shared';
 
 @Injectable()
 export class MembersHandler {
@@ -209,6 +209,25 @@ export class MembersHandler {
     if (updateError) {
       this.logger.warn(`Failed to mark invite as used: ${updateError.message}`);
       // Don't fail the job for this
+    }
+
+    // Insert a system message announcing the new member
+    const { data: joinedProfile } = await adminClient
+      .from('profiles')
+      .select('display_name')
+      .eq('id', userId)
+      .single();
+
+    const { error: msgError } = await adminClient.from('messages').insert({
+      id: generateId(),
+      group_id: groupId,
+      sender_id: null,
+      content: `${joinedProfile?.display_name || 'Someone'} joined the group`,
+      type: 'system',
+    });
+
+    if (msgError) {
+      this.logger.warn(`Failed to insert join system message: ${msgError.message}`);
     }
 
     this.logger.log(`User ${userId} joined group ${groupId} via invite ${inviteId}`);

@@ -21,6 +21,7 @@ export interface MagicLinkResponse {
 export interface OnboardRequest {
   displayName?: string;
   handle?: string;
+  avatarUrl?: string;
 }
 
 export interface CheckEmailRequest {

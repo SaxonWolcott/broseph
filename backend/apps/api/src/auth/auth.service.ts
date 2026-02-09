@@ -189,6 +189,9 @@ export class AuthService {
     if (dto.handle !== undefined) {
       updateData.handle = dto.handle;
     }
+    if (dto.avatarUrl !== undefined) {
+      updateData.avatar_url = dto.avatarUrl;
+    }
 
     // If nothing to update, just return current profile
     if (Object.keys(updateData).length === 0) {
