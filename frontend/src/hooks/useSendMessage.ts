@@ -8,14 +8,26 @@ async function sendMessage(
   accessToken: string,
   groupId: string,
   content: string,
+  promptResponseId?: string,
+  replyInChat?: boolean,
+  replyToId?: string,
 ): Promise<JobAcceptedResponse> {
+  const body: SendMessageRequest = { content };
+  if (promptResponseId) {
+    body.promptResponseId = promptResponseId;
+    body.replyInChat = replyInChat;
+  }
+  if (replyToId) {
+    body.replyToId = replyToId;
+  }
+
   const response = await fetch(`/api/groups/${groupId}/messages`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ content } satisfies SendMessageRequest),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -29,6 +41,9 @@ async function sendMessage(
 interface SendMessageParams {
   groupId: string;
   content: string;
+  promptResponseId?: string;
+  replyInChat?: boolean;
+  replyToId?: string;
 }
 
 /**
@@ -40,8 +55,8 @@ export function useSendMessage() {
   const accessToken = session?.access_token;
 
   return useMutation({
-    mutationFn: ({ groupId, content }: SendMessageParams) =>
-      sendMessage(accessToken!, groupId, content),
+    mutationFn: ({ groupId, content, promptResponseId, replyInChat, replyToId }: SendMessageParams) =>
+      sendMessage(accessToken!, groupId, content, promptResponseId, replyInChat, replyToId),
 
     onMutate: async ({ groupId, content }) => {
       // Cancel any outgoing refetches
@@ -99,9 +114,15 @@ export function useSendMessage() {
       }
     },
 
-    onSettled: (_data, _error, { groupId }) => {
+    onSettled: (_data, _error, { groupId, promptResponseId }) => {
       // Refetch to get the real message
       queryClient.invalidateQueries({ queryKey: messagesQueryKey(groupId) });
+      // Invalidate reply cache if this was a reply
+      if (promptResponseId) {
+        queryClient.invalidateQueries({ queryKey: ['prompts', 'responses', promptResponseId, 'replies'] });
+        // Also invalidate the prompt data so reply counts update
+        queryClient.invalidateQueries({ queryKey: ['prompts', 'group'] });
+      }
     },
   });
 }

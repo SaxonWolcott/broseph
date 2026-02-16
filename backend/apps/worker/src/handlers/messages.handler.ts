@@ -9,7 +9,7 @@ export class MessagesHandler {
   constructor(private supabaseService: SupabaseService) {}
 
   async handleSendMessage(job: Job<SendMessageJobDto>): Promise<{ messageId: string }> {
-    const { groupId, senderId, content } = job.data;
+    const { groupId, senderId, content, promptResponseId, replyInChat, replyToId } = job.data;
     this.logger.log(`Sending message to group ${groupId} from user ${senderId}`);
 
     const adminClient = this.supabaseService.getAdminClient();
@@ -35,6 +35,9 @@ export class MessagesHandler {
       throw new Error(`Message exceeds maximum length of ${LIMITS.MAX_MESSAGE_LENGTH} characters`);
     }
 
+    // Determine message type: prompt_reply (popup only) vs message (chat visible)
+    const messageType = promptResponseId && !replyInChat ? 'prompt_reply' : 'message';
+
     // Insert the message
     const { data: message, error: insertError } = await adminClient
       .from('messages')
@@ -42,6 +45,9 @@ export class MessagesHandler {
         group_id: groupId,
         sender_id: senderId,
         content: content.trim(),
+        prompt_response_id: promptResponseId ?? null,
+        reply_to_id: replyToId ?? null,
+        type: messageType,
       })
       .select('id')
       .single();

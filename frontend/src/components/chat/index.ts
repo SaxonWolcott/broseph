@@ -2,3 +2,6 @@ export * from './ChatHeader';
 export * from './MessageBubble';
 export * from './MessageList';
 export * from './MessageInput';
+export * from './PromptBanner';
+export * from './PromptResponseCard';
+export * from './PromptResponseModal';

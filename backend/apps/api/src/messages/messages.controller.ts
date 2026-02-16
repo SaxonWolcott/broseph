@@ -73,6 +73,9 @@ export class MessagesController {
         senderId: user.id,
         content: dto.content,
         clientMessageId: jobId, // Use jobId as client correlation ID
+        promptResponseId: dto.promptResponseId,
+        replyInChat: dto.replyInChat,
+        replyToId: dto.replyToId,
       },
       { jobId },
     );

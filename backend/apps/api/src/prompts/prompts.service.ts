@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   SupabaseService,
@@ -10,10 +11,13 @@ import {
   PendingPromptsListDto,
   FeedListDto,
   FeedItemDto,
+  GroupPromptTodayDto,
+  PromptResponseRepliesListDto,
   ErrorCode,
   ERROR_MESSAGES,
   SAMPLE_PROMPTS_MAP,
   getPromptForGroupOnDate,
+  generateId,
 } from '@app/shared';
 
 @Injectable()
@@ -219,6 +223,197 @@ export class PromptsService {
       throw new BadRequestException(`Failed to submit response: ${insertError.message}`);
     }
 
+    // 4. Post a prompt_response message in the group chat
+    await adminClient.from('messages').insert({
+      id: generateId(),
+      group_id: groupId,
+      sender_id: userId,
+      content: content,
+      type: 'prompt_response',
+      prompt_response_id: inserted.id,
+    });
+
     return { id: inserted.id, status: 'created' };
+  }
+
+  /**
+   * Get today's prompt for a specific group, including response status and respondents.
+   */
+  async getGroupPromptToday(userId: string, groupId: string): Promise<GroupPromptTodayDto> {
+    const adminClient = this.supabaseService.getAdminClient();
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    // 1. Validate user is a member of the group
+    const { data: member, error: memberError } = await adminClient
+      .from('group_members')
+      .select('id')
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (memberError || !member) {
+      throw new ForbiddenException(ERROR_MESSAGES[ErrorCode.NOT_GROUP_MEMBER]);
+    }
+
+    // 2. Get today's prompt
+    const samplePrompt = getPromptForGroupOnDate(groupId, today);
+
+    // 3. Query prompt_responses for today + this group (with content)
+    const { data: responses, error: responsesError } = await adminClient
+      .from('prompt_responses')
+      .select('id, user_id, content, created_at')
+      .eq('group_id', groupId)
+      .eq('response_date', todayStr);
+
+    if (responsesError) {
+      throw new BadRequestException(`Failed to fetch responses: ${responsesError.message}`);
+    }
+
+    const respondedUserIds = responses?.map((r) => r.user_id) || [];
+    const hasResponded = respondedUserIds.includes(userId);
+    const responseIds = responses?.map((r) => r.id) || [];
+
+    // 4. Batch-fetch profiles and reply counts
+    let respondents: Array<{
+      userId: string;
+      displayName: string | null;
+      avatarUrl: string | null;
+      responseId: string;
+      content: string;
+      createdAt: string;
+      replyCount: number;
+    }> = [];
+
+    if (respondedUserIds.length > 0) {
+      const [profilesResult, replyCountsResult] = await Promise.all([
+        adminClient
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .in('id', respondedUserIds),
+        responseIds.length > 0
+          ? adminClient
+              .from('messages')
+              .select('prompt_response_id')
+              .in('prompt_response_id', responseIds)
+              .eq('type', 'prompt_reply')
+          : Promise.resolve({ data: [] as { prompt_response_id: string }[] }),
+      ]);
+
+      if (profilesResult.error) {
+        throw new BadRequestException(`Failed to fetch respondent profiles: ${profilesResult.error.message}`);
+      }
+
+      // Count replies per response
+      const replyCountMap = new Map<string, number>();
+      for (const row of replyCountsResult.data || []) {
+        const rid = row.prompt_response_id;
+        replyCountMap.set(rid, (replyCountMap.get(rid) || 0) + 1);
+      }
+
+      const profileMap = new Map(
+        (profilesResult.data || []).map((p) => [p.id, p]),
+      );
+
+      respondents = (responses || []).map((r) => {
+        const profile = profileMap.get(r.user_id);
+        return {
+          userId: r.user_id,
+          displayName: profile?.display_name ?? null,
+          avatarUrl: profile?.avatar_url ?? null,
+          responseId: r.id,
+          content: r.content,
+          createdAt: r.created_at,
+          replyCount: replyCountMap.get(r.id) || 0,
+        };
+      });
+    }
+
+    return {
+      prompt: {
+        id: samplePrompt.id,
+        text: samplePrompt.text,
+        category: samplePrompt.category,
+      },
+      hasResponded,
+      respondents,
+    };
+  }
+
+  /**
+   * Get replies to a specific prompt response.
+   */
+  async getResponseReplies(
+    userId: string,
+    responseId: string,
+  ): Promise<PromptResponseRepliesListDto> {
+    const adminClient = this.supabaseService.getAdminClient();
+
+    // 1. Fetch the prompt response to get its group_id
+    const { data: promptResponse, error: prError } = await adminClient
+      .from('prompt_responses')
+      .select('id, group_id')
+      .eq('id', responseId)
+      .maybeSingle();
+
+    if (prError || !promptResponse) {
+      throw new NotFoundException('Prompt response not found');
+    }
+
+    // 2. Validate membership
+    const { data: member, error: memberError } = await adminClient
+      .from('group_members')
+      .select('id')
+      .eq('group_id', promptResponse.group_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (memberError || !member) {
+      throw new ForbiddenException(ERROR_MESSAGES[ErrorCode.NOT_GROUP_MEMBER]);
+    }
+
+    // 3. Fetch comment messages (popup-only, not reply-in-chat)
+    const { data: replies, error: repliesError } = await adminClient
+      .from('messages')
+      .select('id, sender_id, content, created_at')
+      .eq('prompt_response_id', responseId)
+      .eq('type', 'prompt_reply')
+      .order('created_at', { ascending: true })
+      .limit(50);
+
+    if (repliesError) {
+      throw new BadRequestException(`Failed to fetch replies: ${repliesError.message}`);
+    }
+
+    if (!replies || replies.length === 0) {
+      return { replies: [] };
+    }
+
+    // 4. Batch-fetch sender profiles
+    const senderIds = [...new Set(replies.map((r) => r.sender_id).filter(Boolean))];
+    const { data: profiles } = await adminClient
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .in('id', senderIds);
+
+    const profileMap = new Map(
+      (profiles || []).map((p) => [p.id, p]),
+    );
+
+    return {
+      replies: replies.map((r) => {
+        const profile = r.sender_id ? profileMap.get(r.sender_id) : null;
+        return {
+          id: r.id,
+          sender: {
+            id: r.sender_id || '',
+            displayName: profile?.display_name ?? null,
+            avatarUrl: profile?.avatar_url ?? null,
+          },
+          content: r.content,
+          createdAt: r.created_at,
+        };
+      }),
+    };
   }
 }

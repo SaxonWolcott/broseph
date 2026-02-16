@@ -5,13 +5,33 @@ export interface MessageSender {
   avatarUrl: string | null;
 }
 
+export interface PromptData {
+  promptId: string;
+  promptText: string;
+  promptCategory?: string;
+  responseContent: string;
+  responseSenderName?: string;
+  responseSenderAvatarUrl?: string;
+}
+
+export interface ReplyToPreview {
+  senderName: string | null;
+  senderAvatarUrl: string | null;
+  content: string;
+}
+
 export interface Message {
   id: string;
   groupId: string;
   sender: MessageSender | null;
   content: string;
   createdAt: string;
-  type: 'message' | 'system';
+  type: 'message' | 'system' | 'prompt_response';
+  promptResponseId?: string | null;
+  promptData?: PromptData | null;
+  replyCount?: number | null;
+  replyToId?: string | null;
+  replyToPreview?: ReplyToPreview | null;
   // For optimistic updates
   pending?: boolean;
   error?: boolean;
@@ -25,4 +45,7 @@ export interface MessageListResponse {
 
 export interface SendMessageRequest {
   content: string;
+  promptResponseId?: string;
+  replyInChat?: boolean;
+  replyToId?: string;
 }

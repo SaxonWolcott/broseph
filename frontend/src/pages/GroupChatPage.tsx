@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@heroui/react';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,7 +8,10 @@ import { useSendMessage } from '../hooks/useSendMessage';
 import { useLeaveGroup } from '../hooks/useLeaveGroup';
 import { useRealtimeMessages } from '../hooks/useRealtimeMessages';
 import { useRealtimeMembers } from '../hooks/useRealtimeMembers';
-import { ChatHeader, MessageList, MessageInput } from '../components/chat';
+import { useGroupPrompt } from '../hooks/useGroupPrompt';
+import { useSubmitPromptResponse } from '../hooks/useSubmitPromptResponse';
+import { ChatHeader, MessageList, MessageInput, PromptBanner } from '../components/chat';
+import type { ReplyContext } from '../components/chat/MessageInput';
 import { MemberList } from '../components/members';
 import { InviteModal } from '../components/invites';
 
@@ -20,6 +23,7 @@ export default function GroupChatPage() {
   const [isMembersOpen, setIsMembersOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
+  const [replyContext, setReplyContext] = useState<ReplyContext | null>(null);
 
   const { data: group, isLoading: isGroupLoading, error: groupError } = useGroup(id);
   const {
@@ -31,14 +35,35 @@ export default function GroupChatPage() {
   } = useMessages(id);
   const sendMessage = useSendMessage();
   const leaveGroup = useLeaveGroup();
+  const { data: promptData } = useGroupPrompt(id);
+  const submitPromptResponse = useSubmitPromptResponse();
 
   // Real-time subscriptions for instant updates
   useRealtimeMessages(id);
   useRealtimeMembers(id);
 
+  const handleReplyToPromptResponse = useCallback((responseId: string, senderName: string, replyInChat: boolean) => {
+    setReplyContext({ responseId, senderName, replyInChat });
+  }, []);
+
+  const handleReplyToMessage = useCallback((message: import('../types/messages').Message) => {
+    setReplyContext({
+      messageId: message.id,
+      senderName: message.sender?.displayName || message.sender?.handle || 'Unknown',
+      previewContent: message.content.length > 60 ? message.content.slice(0, 60) + '...' : message.content,
+    });
+  }, []);
+
   const handleSendMessage = (content: string) => {
     if (!id) return;
-    sendMessage.mutate({ groupId: id, content });
+    sendMessage.mutate({
+      groupId: id,
+      content,
+      promptResponseId: replyContext?.responseId,
+      replyInChat: replyContext?.replyInChat,
+      replyToId: replyContext?.messageId,
+    });
+    setReplyContext(null);
   };
 
   const handleLeaveGroup = async () => {
@@ -73,7 +98,7 @@ export default function GroupChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-screen">
       <ChatHeader
         group={group}
         onMembersClick={() => setIsMembersOpen(true)}
@@ -81,15 +106,36 @@ export default function GroupChatPage() {
         onLeaveClick={() => setIsLeaveConfirmOpen(true)}
       />
 
+      {promptData && (
+        <PromptBanner
+          prompt={promptData.prompt}
+          hasResponded={promptData.hasResponded}
+          respondents={promptData.respondents}
+          totalMembers={group.memberCount}
+          onSubmitResponse={(content) =>
+            submitPromptResponse.mutate({ groupId: group.id, content })
+          }
+          isSubmitting={submitPromptResponse.isPending}
+          onReplyToResponse={handleReplyToPromptResponse}
+        />
+      )}
+
       <MessageList
         data={messagesData}
         isLoading={isMessagesLoading}
         isFetchingNextPage={isFetchingNextPage}
         hasNextPage={hasNextPage ?? false}
         fetchNextPage={fetchNextPage}
+        onReplyToPromptResponse={handleReplyToPromptResponse}
+        onReplyToMessage={handleReplyToMessage}
       />
 
-      <MessageInput onSend={handleSendMessage} isLoading={sendMessage.isPending} />
+      <MessageInput
+        onSend={handleSendMessage}
+        isLoading={sendMessage.isPending}
+        replyContext={replyContext}
+        onCancelReply={() => setReplyContext(null)}
+      />
 
       {/* Members Modal */}
       <MemberList

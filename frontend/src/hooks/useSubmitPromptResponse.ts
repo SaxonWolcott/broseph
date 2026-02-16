@@ -1,8 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { SubmitPromptRequest } from '../types/prompts';
-import { PROMPTS_TODO_QUERY_KEY } from './usePromptsToDo';
-import { PROMPT_FEED_QUERY_KEY } from './usePromptFeed';
 
 async function submitResponse(
   accessToken: string,
@@ -32,9 +30,11 @@ export function useSubmitPromptResponse() {
 
   return useMutation({
     mutationFn: (data: SubmitPromptRequest) => submitResponse(accessToken!, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: PROMPTS_TODO_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: PROMPT_FEED_QUERY_KEY });
+    onSuccess: (_data, variables) => {
+      // Invalidate the group-specific prompt query so the UI updates
+      queryClient.invalidateQueries({ queryKey: ['prompts', 'group', variables.groupId, 'today'] });
+      // Invalidate messages so the new prompt_response message appears in chat
+      queryClient.invalidateQueries({ queryKey: ['groups', variables.groupId, 'messages'] });
     },
   });
 }

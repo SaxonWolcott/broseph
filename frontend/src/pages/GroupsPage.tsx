@@ -41,7 +41,7 @@ export default function GroupsPage() {
   const groups = data?.groups ?? [];
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-screen">
       {/* Header */}
       <div className="border-b border-divider p-4 flex items-center justify-between">
         <h1 className="text-xl font-bold">Groups</h1>
@@ -70,8 +70,8 @@ export default function GroupsPage() {
         </Button>
       </div>
 
-      {/* Group List - pb-20 for bottom tab bar spacing */}
-      <div className="flex-1 overflow-y-auto p-4 pb-20">
+      {/* Group List */}
+      <div className="flex-1 overflow-y-auto p-4">
         {groups.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <p className="text-default-400 mb-4">No groups yet</p>

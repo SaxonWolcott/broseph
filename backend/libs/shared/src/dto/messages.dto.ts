@@ -9,7 +9,8 @@ import {
   Min,
   Max,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
+import { IsBoolean } from 'class-validator';
 import { LIMITS } from '../constants/limits';
 
 // Request DTOs
@@ -24,6 +25,31 @@ export class SendMessageDto {
   @MinLength(1)
   @MaxLength(LIMITS.MAX_MESSAGE_LENGTH)
   content!: string;
+
+  @ApiPropertyOptional({
+    description: 'Prompt response ID to reply to',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  promptResponseId?: string;
+
+  @ApiPropertyOptional({
+    description: 'If true, reply appears in chat stream with ghost preview. If false, reply only visible in popup.',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === true || value === 'true')
+  replyInChat?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Message ID to reply to (general message reply)',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  replyToId?: string;
 }
 
 export class MessagesQueryDto {
@@ -81,8 +107,34 @@ export class MessageDto {
   @ApiProperty()
   createdAt!: string;
 
-  @ApiPropertyOptional({ default: 'message', example: 'system', enum: ['message', 'system'] })
-  type!: 'message' | 'system';
+  @ApiPropertyOptional({ default: 'message', enum: ['message', 'system', 'prompt_response'] })
+  type!: 'message' | 'system' | 'prompt_response';
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Linked prompt response ID' })
+  promptResponseId!: string | null;
+
+  @ApiPropertyOptional({ description: 'Prompt data (for prompt_response and reply-in-chat messages)' })
+  promptData!: {
+    promptId: string;
+    promptText: string;
+    promptCategory?: string;
+    responseContent: string;
+    responseSenderName?: string;
+    responseSenderAvatarUrl?: string;
+  } | null;
+
+  @ApiPropertyOptional({ description: 'Number of comments on this prompt response' })
+  replyCount!: number | null;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Message this is a reply to' })
+  replyToId!: string | null;
+
+  @ApiPropertyOptional({ description: 'Preview of the message being replied to' })
+  replyToPreview!: {
+    senderName: string | null;
+    senderAvatarUrl: string | null;
+    content: string;
+  } | null;
 }
 
 export class MessageListDto {

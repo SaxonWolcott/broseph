@@ -3,9 +3,11 @@ import {
   Get,
   Post,
   Body,
+  Param,
   UseGuards,
   HttpCode,
   HttpStatus,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { User } from '@supabase/supabase-js';
@@ -13,6 +15,8 @@ import {
   SubmitPromptResponseDto,
   PendingPromptsListDto,
   FeedListDto,
+  GroupPromptTodayDto,
+  PromptResponseRepliesListDto,
 } from '@app/shared';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -53,5 +57,28 @@ export class PromptsController {
     @Body() dto: SubmitPromptResponseDto,
   ): Promise<{ id: string; status: string }> {
     return this.promptsService.submitResponse(user.id, dto.groupId, dto.content);
+  }
+
+  @Get('group/:groupId/today')
+  @ApiOperation({ summary: "Get today's prompt for a group" })
+  @ApiResponse({ status: 200, type: GroupPromptTodayDto })
+  @ApiResponse({ status: 403, description: 'Not a member of this group' })
+  async getGroupPromptToday(
+    @Param('groupId') groupId: string,
+    @CurrentUser() user: User,
+  ): Promise<GroupPromptTodayDto> {
+    return this.promptsService.getGroupPromptToday(user.id, groupId);
+  }
+
+  @Get('responses/:responseId/replies')
+  @ApiOperation({ summary: 'Get replies to a prompt response' })
+  @ApiResponse({ status: 200, type: PromptResponseRepliesListDto })
+  @ApiResponse({ status: 403, description: 'Not a member of the response group' })
+  @ApiResponse({ status: 404, description: 'Prompt response not found' })
+  async getResponseReplies(
+    @Param('responseId', ParseUUIDPipe) responseId: string,
+    @CurrentUser() user: User,
+  ): Promise<PromptResponseRepliesListDto> {
+    return this.promptsService.getResponseReplies(user.id, responseId);
   }
 }

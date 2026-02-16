@@ -10,6 +10,7 @@ import {
   MessageSenderDto,
   ErrorCode,
   ERROR_MESSAGES,
+  SAMPLE_PROMPTS_MAP,
 } from '@app/shared';
 
 @Injectable()
@@ -40,6 +41,7 @@ export class MessagesService {
 
   /**
    * Get messages for a group with cursor-based pagination.
+   * Excludes prompt_reply type (popup-only replies) from the chat stream.
    */
   async getMessages(
     groupId: string,
@@ -49,7 +51,7 @@ export class MessagesService {
     const userClient = this.supabaseService.getClientForUser(accessToken);
     const { cursor, limit } = options;
 
-    // Build the query
+    // Build the query — exclude prompt_reply (popup-only) messages
     let query = userClient
       .from('messages')
       .select(
@@ -60,6 +62,8 @@ export class MessagesService {
         content,
         created_at,
         type,
+        prompt_response_id,
+        reply_to_id,
         sender:sender_id (
           id,
           display_name,
@@ -69,6 +73,7 @@ export class MessagesService {
       `,
       )
       .eq('group_id', groupId)
+      .neq('type', 'prompt_reply')
       .order('created_at', { ascending: false })
       .limit(limit + 1); // Fetch one extra to check if there are more
 
@@ -95,6 +100,90 @@ export class MessagesService {
     const hasMore = messages && messages.length > limit;
     const resultMessages = hasMore ? messages.slice(0, limit) : messages || [];
 
+    // Collect ALL prompt_response_ids (from both prompt_response cards AND reply-in-chat messages)
+    const promptResponseIds = resultMessages
+      .filter((m) => m.prompt_response_id)
+      .map((m) => m.prompt_response_id as string);
+
+    const uniquePrIds = [...new Set(promptResponseIds)];
+
+    let promptResponseMap = new Map<string, { prompt_id: string; content: string; user_id: string }>();
+    let replyCountMap = new Map<string, number>();
+    let responderProfileMap = new Map<string, { display_name: string | null; avatar_url: string | null }>();
+
+    if (uniquePrIds.length > 0) {
+      const adminClient = this.supabaseService.getAdminClient();
+      const [prResult, rcResult] = await Promise.all([
+        adminClient
+          .from('prompt_responses')
+          .select('id, prompt_id, content, user_id')
+          .in('id', uniquePrIds),
+        adminClient
+          .from('messages')
+          .select('prompt_response_id')
+          .in('prompt_response_id', uniquePrIds)
+          .eq('type', 'prompt_reply'),
+      ]);
+
+      promptResponseMap = new Map(
+        (prResult.data || []).map((pr) => [pr.id, { prompt_id: pr.prompt_id, content: pr.content, user_id: pr.user_id }]),
+      );
+
+      for (const row of rcResult.data || []) {
+        const rid = row.prompt_response_id;
+        replyCountMap.set(rid, (replyCountMap.get(rid) || 0) + 1);
+      }
+
+      // Batch-fetch responder profiles for ghost previews
+      const responderUserIds = [...new Set((prResult.data || []).map((pr) => pr.user_id))];
+      if (responderUserIds.length > 0) {
+        const { data: profiles } = await adminClient
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .in('id', responderUserIds);
+
+        responderProfileMap = new Map(
+          (profiles || []).map((p) => [p.id, { display_name: p.display_name, avatar_url: p.avatar_url }]),
+        );
+      }
+    }
+
+    // Batch-fetch reply-to messages for replyToPreview
+    const replyToIds = resultMessages
+      .filter((m) => m.reply_to_id)
+      .map((m) => m.reply_to_id as string);
+
+    const uniqueReplyToIds = [...new Set(replyToIds)];
+    let replyToMap = new Map<string, { content: string; sender_id: string | null }>();
+    let replyToSenderMap = new Map<string, { display_name: string | null; avatar_url: string | null }>();
+
+    if (uniqueReplyToIds.length > 0) {
+      const adminClient2 = this.supabaseService.getAdminClient();
+      const { data: replyToMessages } = await adminClient2
+        .from('messages')
+        .select('id, content, sender_id')
+        .in('id', uniqueReplyToIds);
+
+      replyToMap = new Map(
+        (replyToMessages || []).map((rm) => [rm.id, { content: rm.content, sender_id: rm.sender_id }]),
+      );
+
+      // Fetch sender profiles for reply-to messages
+      const replyToSenderIds = [...new Set(
+        (replyToMessages || []).filter((rm) => rm.sender_id).map((rm) => rm.sender_id as string),
+      )];
+      if (replyToSenderIds.length > 0) {
+        const { data: rtProfiles } = await adminClient2
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .in('id', replyToSenderIds);
+
+        replyToSenderMap = new Map(
+          (rtProfiles || []).map((p) => [p.id, { display_name: p.display_name, avatar_url: p.avatar_url }]),
+        );
+      }
+    }
+
     const messageDtos: MessageDto[] = resultMessages.map((m) => {
       let sender: MessageSenderDto | null = null;
 
@@ -114,13 +203,59 @@ export class MessagesService {
         };
       }
 
+      const messageType = ((m as unknown as { type: string }).type as 'message' | 'system' | 'prompt_response') ?? 'message';
+      const promptResponseId = (m.prompt_response_id as string) ?? null;
+
+      // Enrich messages that have a linked prompt response
+      let promptData: MessageDto['promptData'] = null;
+      let replyCount: number | null = null;
+
+      if (promptResponseId) {
+        const pr = promptResponseMap.get(promptResponseId);
+        if (pr) {
+          const prompt = SAMPLE_PROMPTS_MAP[pr.prompt_id];
+          const responderProfile = responderProfileMap.get(pr.user_id);
+
+          promptData = {
+            promptId: pr.prompt_id,
+            promptText: prompt?.text ?? 'Unknown prompt',
+            promptCategory: prompt?.category,
+            responseContent: pr.content,
+            responseSenderName: responderProfile?.display_name ?? undefined,
+            responseSenderAvatarUrl: responderProfile?.avatar_url ?? undefined,
+          };
+        }
+        replyCount = replyCountMap.get(promptResponseId) || 0;
+      }
+
+      // Enrich reply-to preview
+      const replyToId = (m.reply_to_id as string) ?? null;
+      let replyToPreview: MessageDto['replyToPreview'] = null;
+
+      if (replyToId) {
+        const replyToMsg = replyToMap.get(replyToId);
+        if (replyToMsg) {
+          const rtSender = replyToMsg.sender_id ? replyToSenderMap.get(replyToMsg.sender_id) : null;
+          replyToPreview = {
+            senderName: rtSender?.display_name ?? null,
+            senderAvatarUrl: rtSender?.avatar_url ?? null,
+            content: replyToMsg.content.length > 100 ? replyToMsg.content.slice(0, 100) + '...' : replyToMsg.content,
+          };
+        }
+      }
+
       return {
         id: m.id,
         groupId: m.group_id,
         sender,
         content: m.content,
         createdAt: m.created_at,
-        type: ((m as unknown as { type: string }).type as 'message' | 'system') ?? 'message',
+        type: messageType,
+        promptResponseId,
+        promptData,
+        replyCount,
+        replyToId,
+        replyToPreview,
       };
     });
 

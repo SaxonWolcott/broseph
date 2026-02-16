@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Broseph: Prompt UI Playground</title>
+<style>
+  /* ── Reset & base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: #09090b;
+    color: #ECEDEE;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 48px;
+  }
+
+  /* ── Controls area ── */
+  .controls {
+    max-width: 520px;
+    width: 100%;
+    margin-bottom: 28px;
+    text-align: center;
+  }
+  .controls h1 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+  }
+  .controls .subtitle {
+    color: #9ca3af;
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+
+  /* Tab selector */
+  .tab-bar {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-bottom: 14px;
+  }
+  .tab-btn {
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    color: #9ca3af;
+    padding: 8px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+    line-height: 1.3;
+  }
+  .tab-btn:hover { background: #3f3f46; color: #ECEDEE; }
+  .tab-btn.active {
+    background: #006FEE;
+    border-color: #006FEE;
+    color: #fff;
+  }
+
+  /* Answered toggle */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .toggle-label { font-size: 13px; color: #9ca3af; }
+  .toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    cursor: pointer;
+  }
+  .toggle-switch input { display: none; }
+  .toggle-track {
+    position: absolute;
+    inset: 0;
+    background: #3f3f46;
+    border-radius: 999px;
+    transition: background 0.25s;
+  }
+  .toggle-switch input:checked + .toggle-track { background: #17c964; }
+  .toggle-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.25s;
+    pointer-events: none;
+  }
+  .toggle-switch input:checked ~ .toggle-thumb { transform: translateX(20px); }
+
+  /* Trade-off description */
+  .tradeoff {
+    font-size: 13px;
+    color: #9ca3af;
+    min-height: 36px;
+    line-height: 1.5;
+    transition: opacity 0.2s;
+    max-width: 440px;
+    margin: 0 auto;
+  }
+
+  /* ── Phone mock ── */
+  .phone {
+    width: 375px;
+    height: 700px;
+    border: 2px solid #3f3f46;
+    border-radius: 28px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: #18181b;
+    position: relative;
+    box-shadow: 0 0 60px rgba(0,0,0,0.5);
+  }
+
+  /* ── Chat header ── */
+  .chat-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 14px;
+    background: #18181b;
+    border-bottom: 1px solid #3f3f46;
+    flex-shrink: 0;
+    z-index: 10;
+    position: relative;
+  }
+  .header-back {
+    color: #9ca3af;
+    margin-right: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+  }
+  .header-back svg { width: 22px; height: 22px; }
+  .header-center {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    margin-left: -32px; /* offset back arrow for visual centering */
+  }
+  .header-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #006FEE, #7c3aed);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .header-info { text-align: left; }
+  .header-name { font-size: 15px; font-weight: 600; }
+  .header-sub { font-size: 11px; color: #9ca3af; }
+  .header-kebab {
+    position: absolute;
+    right: 14px;
+    color: #9ca3af;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+  }
+  .header-kebab svg { width: 20px; height: 20px; }
+
+  /* ── Banner area (Approach B) ── */
+  .banner-area {
+    flex-shrink: 0;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.35s ease;
+  }
+  .banner-area.visible { max-height: 200px; }
+
+  .prompt-banner {
+    background: #1e1e24;
+    border-bottom: 1px solid #3f3f46;
+    padding: 10px 14px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .banner-collapsed {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .banner-icon { color: #f5a524; font-size: 16px; flex-shrink: 0; }
+  .banner-text {
+    flex: 1;
+    font-size: 13px;
+    color: #ECEDEE;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .banner-chevron {
+    color: #9ca3af;
+    flex-shrink: 0;
+    transition: transform 0.3s;
+    display: flex;
+    align-items: center;
+  }
+  .banner-chevron svg { width: 16px; height: 16px; }
+  .banner-dot {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    width: 8px;
+    height: 8px;
+    background: #f31260;
+    border-radius: 50%;
+    transition: opacity 0.3s;
+  }
+  .banner-expanded-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease, padding 0.35s ease;
+    padding: 0 0;
+  }
+  .banner-expanded-content.open {
+    max-height: 160px;
+    padding: 10px 0 4px;
+  }
+  .banner-full-text {
+    font-size: 14px;
+    color: #ECEDEE;
+    margin-bottom: 8px;
+    line-height: 1.45;
+  }
+  .banner-textarea {
+    width: 100%;
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    border-radius: 10px;
+    color: #ECEDEE;
+    padding: 8px 10px;
+    font-size: 13px;
+    resize: none;
+    height: 36px;
+    outline: none;
+    font-family: inherit;
+    margin-bottom: 6px;
+  }
+  .banner-textarea::placeholder { color: #71717a; }
+  .banner-submit {
+    background: #006FEE;
+    border: none;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .banner-answered-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .banner-answered-check { color: #17c964; font-size: 14px; }
+  .banner-answered-text { font-size: 12px; color: #17c964; font-weight: 600; }
+  .banner-answered-count { font-size: 11px; color: #9ca3af; margin-left: auto; }
+
+  /* ── Messages area ── */
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    scroll-behavior: smooth;
+  }
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+
+  /* Message rows */
+  .msg-row {
+    display: flex;
+    gap: 8px;
+    max-width: 82%;
+    animation: fadeIn 0.15s ease;
+  }
+  .msg-row.own {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+    gap: 0;
+  }
+  .msg-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+    align-self: flex-end;
+  }
+  .msg-avatar.marcus { background: #e03e6a; }
+  .msg-avatar.jake { background: #0ea5e9; }
+  .msg-avatar.broseph-avatar {
+    background: linear-gradient(135deg, #7c3aed, #006FEE);
+    font-size: 15px;
+  }
+
+  .msg-content { display: flex; flex-direction: column; gap: 2px; }
+  .msg-sender {
+    font-size: 11px;
+    font-weight: 600;
+    color: #9ca3af;
+    margin-left: 4px;
+    margin-bottom: 1px;
+  }
+  .msg-bubble {
+    padding: 9px 14px;
+    border-radius: 18px;
+    font-size: 14px;
+    line-height: 1.4;
+    max-width: 100%;
+    word-wrap: break-word;
+  }
+  .msg-bubble.other {
+    background: #27272a;
+    color: #ECEDEE;
+    border-bottom-left-radius: 6px;
+  }
+  .msg-bubble.own {
+    background: #006FEE;
+    color: #fff;
+    border-bottom-right-radius: 6px;
+  }
+  .msg-time {
+    font-size: 10px;
+    color: #71717a;
+    margin-top: 1px;
+    padding: 0 4px;
+  }
+  .msg-row.own .msg-time { text-align: right; }
+
+  /* System message */
+  .system-msg {
+    text-align: center;
+    font-size: 11px;
+    color: #71717a;
+    padding: 6px 0;
+  }
+
+  /* ── Approach A: Inline Card ── */
+  .prompt-card {
+    align-self: center;
+    width: 92%;
+    background: #27272a;
+    border-radius: 14px;
+    border-left: 3px solid #006FEE;
+    padding: 14px 16px;
+    margin: 6px 0;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+    transition: all 0.35s ease;
+  }
+  .prompt-card-category {
+    display: inline-block;
+    background: rgba(0,111,238,0.15);
+    color: #006FEE;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+  }
+  .prompt-card-text {
+    font-size: 14px;
+    color: #ECEDEE;
+    line-height: 1.45;
+    margin-bottom: 12px;
+  }
+  .prompt-card-btn {
+    background: #006FEE;
+    color: #fff;
+    border: none;
+    padding: 7px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .prompt-card-btn:hover { background: #0062d4; }
+  .prompt-card-answered {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .prompt-card-answered-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #17c964;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .prompt-card-avatars {
+    display: flex;
+    gap: 0;
+  }
+  .prompt-card-avatars .mini-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    color: #fff;
+    border: 2px solid #27272a;
+    margin-left: -6px;
+  }
+  .prompt-card-avatars .mini-avatar:first-child { margin-left: 0; }
+  .prompt-card-count {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-left: 6px;
+  }
+
+  /* ── Approach C: Bot message ── */
+  .msg-bot-row {
+    display: flex;
+    gap: 8px;
+    max-width: 88%;
+    margin: 4px 0;
+  }
+  .msg-bot-bubble {
+    background: linear-gradient(135deg, #27272a 0%, #2a2a35 100%);
+    border: 1px solid #3f3f46;
+    border-radius: 18px;
+    border-bottom-left-radius: 6px;
+    padding: 12px 14px;
+  }
+  .bot-name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .bot-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: #9ca3af;
+  }
+  .bot-badge {
+    font-size: 9px;
+    font-weight: 700;
+    background: rgba(124,58,237,0.25);
+    color: #a78bfa;
+    padding: 1px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+  }
+  .bot-label {
+    font-size: 11px;
+    color: #9ca3af;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .bot-prompt-text {
+    font-size: 14px;
+    color: #ECEDEE;
+    line-height: 1.45;
+    margin-bottom: 8px;
+  }
+  .bot-cta {
+    font-size: 12px;
+    color: #006FEE;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .bot-answered-text {
+    font-size: 12px;
+    color: #9ca3af;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .bot-answered-text .check { color: #17c964; }
+
+  /* ── Approach D: Floating bar ── */
+  .floating-bar-area {
+    flex-shrink: 0;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.35s ease;
+  }
+  .floating-bar-area.visible { max-height: 200px; }
+
+  .floating-bar {
+    background: #27272a;
+    border-top: 1px solid #3f3f46;
+    padding: 9px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+  }
+  .floating-icon { color: #f5a524; font-size: 16px; flex-shrink: 0; }
+  .floating-text {
+    flex: 1;
+    font-size: 13px;
+    color: #ECEDEE;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .floating-respond-btn {
+    background: #006FEE;
+    color: #fff;
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .floating-dismiss {
+    color: #71717a;
+    cursor: pointer;
+    font-size: 16px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+  .floating-dismiss svg { width: 16px; height: 16px; }
+  .floating-expanded-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease, padding 0.35s ease;
+    padding: 0 14px;
+    background: #27272a;
+  }
+  .floating-expanded-content.open {
+    max-height: 160px;
+    padding: 0 14px 10px;
+  }
+  .floating-full-text {
+    font-size: 14px;
+    color: #ECEDEE;
+    margin-bottom: 8px;
+    line-height: 1.45;
+  }
+  .floating-textarea {
+    width: 100%;
+    background: #1e1e24;
+    border: 1px solid #3f3f46;
+    border-radius: 10px;
+    color: #ECEDEE;
+    padding: 8px 10px;
+    font-size: 13px;
+    resize: none;
+    height: 36px;
+    outline: none;
+    font-family: inherit;
+    margin-bottom: 6px;
+  }
+  .floating-textarea::placeholder { color: #71717a; }
+  .floating-submit-btn {
+    background: #006FEE;
+    border: none;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .floating-answered-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+  }
+  .floating-answered-check { color: #17c964; font-size: 14px; }
+  .floating-answered-label { font-size: 12px; color: #17c964; font-weight: 600; }
+  .floating-answered-count { font-size: 11px; color: #9ca3af; }
+  .floating-view-btn {
+    background: transparent;
+    border: 1px solid #3f3f46;
+    color: #9ca3af;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* ── Message input bar ── */
+  .input-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: #18181b;
+    border-top: 1px solid #3f3f46;
+    flex-shrink: 0;
+  }
+  .input-field {
+    flex: 1;
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    border-radius: 20px;
+    color: #ECEDEE;
+    padding: 9px 16px;
+    font-size: 14px;
+    outline: none;
+    font-family: inherit;
+  }
+  .input-field::placeholder { color: #71717a; }
+  .send-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #006FEE;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .send-btn svg { width: 18px; height: 18px; }
+
+  /* ── Utilities ── */
+  .hidden { display: none !important; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .spacer { height: 6px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ Controls ═══════════ -->
+<div class="controls">
+  <h1>Broseph: Prompt UI Playground</h1>
+  <p class="subtitle">How should daily prompts appear in group chats?</p>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-approach="A">A: Inline Card</button>
+    <button class="tab-btn" data-approach="B">B: Header Banner</button>
+    <button class="tab-btn" data-approach="C">C: Bot Message</button>
+    <button class="tab-btn" data-approach="D">D: Floating Bar</button>
+  </div>
+
+  <div class="toggle-row">
+    <span class="toggle-label">Unanswered</span>
+    <label class="toggle-switch">
+      <input type="checkbox" id="answeredToggle">
+      <div class="toggle-track"></div>
+      <div class="toggle-thumb"></div>
+    </label>
+    <span class="toggle-label">Answered</span>
+  </div>
+
+  <p class="tradeoff" id="tradeoffText">Most visually distinct. Clear call-to-action. Takes up vertical space in chat.</p>
+</div>
+
+<!-- ═══════════ Phone mock ═══════════ -->
+<div class="phone">
+
+  <!-- Chat header -->
+  <div class="chat-header">
+    <div class="header-back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </div>
+    <div class="header-center">
+      <div class="header-avatar">TB</div>
+      <div class="header-info">
+        <div class="header-name">The Boys</div>
+        <div class="header-sub">4 members</div>
+      </div>
+    </div>
+    <div class="header-kebab">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+    </div>
+  </div>
+
+  <!-- Approach B: Banner (inserted here) -->
+  <div class="banner-area" id="bannerArea">
+    <div class="prompt-banner" id="promptBanner" onclick="toggleBannerExpand()">
+
+      <!-- Unanswered state -->
+      <div id="bannerUnanswered">
+        <div class="banner-collapsed">
+          <span class="banner-icon">&#128161;</span>
+          <span class="banner-text">What's something you've changed your mind about recently?</span>
+          <span class="banner-chevron" id="bannerChevron">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </span>
+        </div>
+        <div class="banner-dot" id="bannerDot"></div>
+        <div class="banner-expanded-content" id="bannerExpanded">
+          <div class="banner-full-text">What's something you've changed your mind about recently?</div>
+          <textarea class="banner-textarea" placeholder="Type your response..." onclick="event.stopPropagation()"></textarea>
+          <button class="banner-submit" onclick="event.stopPropagation()">Submit</button>
+        </div>
+      </div>
+
+      <!-- Answered state -->
+      <div id="bannerAnswered" class="hidden">
+        <div class="banner-collapsed">
+          <div class="banner-answered-row">
+            <span class="banner-answered-check">&#10003;</span>
+            <span class="banner-answered-text">Answered</span>
+            <span class="banner-answered-count">2/4 responded</span>
+          </div>
+          <span class="banner-chevron" id="bannerChevronAnswered">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </span>
+        </div>
+        <div class="banner-expanded-content" id="bannerExpandedAnswered">
+          <div class="banner-full-text">What's something you've changed your mind about recently?</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Messages -->
+  <div class="messages" id="messagesArea">
+
+    <!-- Date divider -->
+    <div class="system-msg" style="margin-bottom:4px;">Today</div>
+
+    <!-- Message 1: Marcus -->
+    <div class="msg-row">
+      <div class="msg-avatar marcus">M</div>
+      <div class="msg-content">
+        <div class="msg-sender">Marcus</div>
+        <div class="msg-bubble other">anyone down for basketball saturday?</div>
+        <div class="msg-time">2:14 PM</div>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <!-- Message 2: Jake -->
+    <div class="msg-row">
+      <div class="msg-avatar jake">J</div>
+      <div class="msg-content">
+        <div class="msg-sender">Jake</div>
+        <div class="msg-bubble other">I'm in, what time?</div>
+        <div class="msg-time">2:16 PM</div>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <!-- Message 3: You -->
+    <div class="msg-row own">
+      <div class="msg-content">
+        <div class="msg-bubble own">Same, after 2pm works for me</div>
+        <div class="msg-time">2:18 PM</div>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <!-- Message 4: Marcus -->
+    <div class="msg-row">
+      <div class="msg-avatar marcus">M</div>
+      <div class="msg-content">
+        <div class="msg-sender">Marcus</div>
+        <div class="msg-bubble other">cool, 3pm at the park?</div>
+        <div class="msg-time">2:20 PM</div>
+      </div>
+    </div>
+
+    <!-- ═══ PROMPT SLOT (Approach A and C appear here) ═══ -->
+    <div id="promptSlot">
+
+      <!-- Approach A: Inline Prompt Card -->
+      <div id="approachA">
+        <!-- Unanswered -->
+        <div class="prompt-card" id="cardUnanswered">
+          <div class="prompt-card-category">Getting Deep</div>
+          <div class="prompt-card-text">What's something you've changed your mind about recently?</div>
+          <button class="prompt-card-btn">Respond</button>
+        </div>
+        <!-- Answered -->
+        <div class="prompt-card hidden" id="cardAnswered">
+          <div class="prompt-card-category">Getting Deep</div>
+          <div class="prompt-card-text">What's something you've changed your mind about recently?</div>
+          <div class="prompt-card-answered">
+            <div class="prompt-card-answered-left">
+              <span>&#10003;</span>
+              <span>You responded</span>
+            </div>
+            <div style="display:flex;align-items:center;">
+              <div class="prompt-card-avatars">
+                <div class="mini-avatar" style="background:#e03e6a;">M</div>
+                <div class="mini-avatar" style="background:#006FEE;">Y</div>
+              </div>
+              <span class="prompt-card-count">2/4</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Approach C: Bot-style message -->
+      <div id="approachC" class="hidden">
+        <!-- Unanswered -->
+        <div class="msg-bot-row" id="botUnanswered">
+          <div class="msg-avatar broseph-avatar">&#9733;</div>
+          <div class="msg-content">
+            <div class="bot-name-row">
+              <span class="bot-name">Broseph</span>
+              <span class="bot-badge">BOT</span>
+            </div>
+            <div class="msg-bot-bubble">
+              <div class="bot-label">Today's prompt:</div>
+              <div class="bot-prompt-text">What's something you've changed your mind about recently?</div>
+              <div class="bot-cta">Tap to respond &rarr;</div>
+            </div>
+            <div class="msg-time">2:22 PM</div>
+          </div>
+        </div>
+        <!-- Answered -->
+        <div class="msg-bot-row hidden" id="botAnswered">
+          <div class="msg-avatar broseph-avatar">&#9733;</div>
+          <div class="msg-content">
+            <div class="bot-name-row">
+              <span class="bot-name">Broseph</span>
+              <span class="bot-badge">BOT</span>
+            </div>
+            <div class="msg-bot-bubble">
+              <div class="bot-label">Today's prompt:</div>
+              <div class="bot-prompt-text">What's something you've changed your mind about recently?</div>
+              <div class="bot-answered-text">
+                <span class="check">&#10003;</span>
+                Marcus and you responded
+              </div>
+            </div>
+            <div class="msg-time">2:22 PM</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <!-- ═══ END PROMPT SLOT ═══ -->
+
+    <div class="spacer"></div>
+
+    <!-- Message 6: Jake -->
+    <div class="msg-row">
+      <div class="msg-avatar jake">J</div>
+      <div class="msg-content">
+        <div class="msg-sender">Jake</div>
+        <div class="msg-bubble other">hell yeah see you there</div>
+        <div class="msg-time">2:23 PM</div>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <!-- System message -->
+    <div class="system-msg">Marcus answered today's prompt</div>
+
+    <div class="spacer"></div>
+
+    <!-- Message 8: You -->
+    <div class="msg-row own">
+      <div class="msg-content">
+        <div class="msg-bubble own">nice what'd you say?</div>
+        <div class="msg-time">2:31 PM</div>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+  </div>
+
+  <!-- Approach D: Floating bar (above input) -->
+  <div class="floating-bar-area" id="floatingBarArea">
+    <!-- Unanswered -->
+    <div id="floatingUnanswered">
+      <div class="floating-bar" onclick="toggleFloatingExpand()">
+        <span class="floating-icon">&#128161;</span>
+        <span class="floating-text">What's something you've changed your mind about recently?</span>
+        <button class="floating-respond-btn" onclick="event.stopPropagation(); toggleFloatingExpand()">Respond</button>
+        <span class="floating-dismiss" onclick="event.stopPropagation()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </span>
+      </div>
+      <div class="floating-expanded-content" id="floatingExpanded">
+        <div class="floating-full-text">What's something you've changed your mind about recently?</div>
+        <textarea class="floating-textarea" placeholder="Type your response..." onclick="event.stopPropagation()"></textarea>
+        <button class="floating-submit-btn" onclick="event.stopPropagation()">Submit</button>
+      </div>
+    </div>
+    <!-- Answered -->
+    <div id="floatingAnswered" class="hidden">
+      <div class="floating-bar">
+        <span class="floating-answered-check">&#10003;</span>
+        <div class="floating-answered-row">
+          <span class="floating-answered-label">Answered</span>
+          <span class="floating-answered-count">&middot; 2/4 responded</span>
+        </div>
+        <button class="floating-view-btn">View</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input bar -->
+  <div class="input-bar">
+    <input class="input-field" type="text" placeholder="Message The Boys...">
+    <button class="send-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+
+</div>
+
+<script>
+  // ── State ──
+  let currentApproach = 'A';
+  let isAnswered = false;
+  let bannerExpandedState = false;
+  let floatingExpandedState = false;
+
+  const tradeoffs = {
+    A: 'Most visually distinct. Clear call-to-action. Takes up vertical space in chat.',
+    B: 'Minimal footprint. Always visible. Easy to miss or ignore.',
+    C: 'Feels natural in a chat app. Blends with conversation. Less distinct.',
+    D: 'Persistent reminder. Doesn\'t interrupt chat flow. Can feel like an ad banner.'
+  };
+
+  // ── Elements ──
+  const tabs = document.querySelectorAll('.tab-btn');
+  const toggle = document.getElementById('answeredToggle');
+  const tradeoffEl = document.getElementById('tradeoffText');
+
+  // Approach A
+  const approachA = document.getElementById('approachA');
+  const cardUnanswered = document.getElementById('cardUnanswered');
+  const cardAnswered = document.getElementById('cardAnswered');
+
+  // Approach B
+  const bannerArea = document.getElementById('bannerArea');
+  const bannerUnanswered = document.getElementById('bannerUnanswered');
+  const bannerAnswered = document.getElementById('bannerAnswered');
+  const bannerExpanded = document.getElementById('bannerExpanded');
+  const bannerExpandedAnswered = document.getElementById('bannerExpandedAnswered');
+  const bannerChevron = document.getElementById('bannerChevron');
+  const bannerChevronAnswered = document.getElementById('bannerChevronAnswered');
+  const bannerDot = document.getElementById('bannerDot');
+
+  // Approach C
+  const approachC = document.getElementById('approachC');
+  const botUnanswered = document.getElementById('botUnanswered');
+  const botAnswered = document.getElementById('botAnswered');
+
+  // Approach D
+  const floatingBarArea = document.getElementById('floatingBarArea');
+  const floatingUnanswered = document.getElementById('floatingUnanswered');
+  const floatingAnswered = document.getElementById('floatingAnswered');
+  const floatingExpanded = document.getElementById('floatingExpanded');
+
+  // ── Tab clicks ──
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabs.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentApproach = btn.dataset.approach;
+      // Reset expand states
+      bannerExpandedState = false;
+      floatingExpandedState = false;
+      render();
+    });
+  });
+
+  // ── Toggle ──
+  toggle.addEventListener('change', () => {
+    isAnswered = toggle.checked;
+    // Reset expand states
+    bannerExpandedState = false;
+    floatingExpandedState = false;
+    render();
+  });
+
+  // ── Banner expand ──
+  function toggleBannerExpand() {
+    bannerExpandedState = !bannerExpandedState;
+    renderBannerExpand();
+  }
+
+  function renderBannerExpand() {
+    if (isAnswered) {
+      bannerExpandedAnswered.classList.toggle('open', bannerExpandedState);
+      bannerChevronAnswered.style.transform = bannerExpandedState ? 'rotate(180deg)' : 'rotate(0)';
+    } else {
+      bannerExpanded.classList.toggle('open', bannerExpandedState);
+      bannerChevron.style.transform = bannerExpandedState ? 'rotate(180deg)' : 'rotate(0)';
+      bannerDot.style.opacity = bannerExpandedState ? '0' : '1';
+    }
+  }
+
+  // ── Floating expand ──
+  function toggleFloatingExpand() {
+    floatingExpandedState = !floatingExpandedState;
+    renderFloatingExpand();
+  }
+
+  function renderFloatingExpand() {
+    floatingExpanded.classList.toggle('open', floatingExpandedState);
+  }
+
+  // ── Render ──
+  function render() {
+    tradeoffEl.textContent = tradeoffs[currentApproach];
+
+    // Hide all approach-specific elements
+    approachA.classList.add('hidden');
+    approachC.classList.add('hidden');
+    bannerArea.classList.remove('visible');
+    floatingBarArea.classList.remove('visible');
+
+    // Show selected
+    switch (currentApproach) {
+      case 'A':
+        approachA.classList.remove('hidden');
+        cardUnanswered.classList.toggle('hidden', isAnswered);
+        cardAnswered.classList.toggle('hidden', !isAnswered);
+        break;
+
+      case 'B':
+        bannerArea.classList.add('visible');
+        bannerUnanswered.classList.toggle('hidden', isAnswered);
+        bannerAnswered.classList.toggle('hidden', !isAnswered);
+        // Reset expand visuals
+        bannerExpanded.classList.remove('open');
+        bannerExpandedAnswered.classList.remove('open');
+        bannerChevron.style.transform = 'rotate(0)';
+        bannerChevronAnswered.style.transform = 'rotate(0)';
+        bannerDot.style.opacity = '1';
+        break;
+
+      case 'C':
+        approachC.classList.remove('hidden');
+        botUnanswered.classList.toggle('hidden', isAnswered);
+        botAnswered.classList.toggle('hidden', !isAnswered);
+        break;
+
+      case 'D':
+        floatingBarArea.classList.add('visible');
+        floatingUnanswered.classList.toggle('hidden', isAnswered);
+        floatingAnswered.classList.toggle('hidden', !isAnswered);
+        // Reset expand visuals
+        floatingExpanded.classList.remove('open');
+        break;
+    }
+
+    // Scroll messages to bottom when changing approach
+    const msgs = document.getElementById('messagesArea');
+    setTimeout(() => {
+      msgs.scrollTop = msgs.scrollHeight;
+    }, 50);
+  }
+
+  // Initial render
+  render();
+
+  // Scroll to bottom on load
+  window.addEventListener('load', () => {
+    const msgs = document.getElementById('messagesArea');
+    msgs.scrollTop = msgs.scrollHeight;
+  });
+</script>
+
+</body>
+</html>

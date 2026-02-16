@@ -2,6 +2,10 @@
 
 High-level tracking of completed and planned work for Broseph - a group messaging app designed to help friends stay in touch.
 
+## Vision
+
+Broseph is the group chat you wish you had with your friends. Not a social media feed, not a broadcast channel — a **group-chat-first** experience where everything happens inside the conversations that matter. Prompts, games, reactions, and nudges all live within your group chats, making it effortless to keep the conversation going with the people you care about.
+
 ## Completed Milestones
 
 - **001: Project Bootstrap** — pnpm monorepo, NestJS backend, React frontend, Supabase DB, Claude subagents
@@ -16,19 +20,32 @@ High-level tracking of completed and planned work for Broseph - a group messagin
 - **010: Fix Invite Flow Race Condition** — Stabilized invite acceptance
 - **011: Prompts Feature Phase 1** — Daily conversation prompts, realtime feed, type safety
 - **012: Comprehensive README** — Full project documentation for independent study review
+- **013: Group Chat Restructure** — Pivoted to group-chat-centric design, prompts as header banner in chat
+- **014: Prompt Responses in Chat** — In-chat cards, comments, reply-in-chat (iMessage-style), reply to any message, smart timestamps
 
 See `/milestones/` for detailed retrospectives on each.
 
 ## Upcoming Work
 
-### Engagement Features
-- [ ] Rework conversation prompts system
-- [ ] Push notifications for new messages
-- [ ] Engagement reminders
+### In-Chat Prompts (Active)
+- [x] Restructure app around group chats (remove Home feed, simplify nav)
+- [x] Daily prompts appear inside group chats (header banner)
+- [x] Prompt responses post as messages in the chat (special cards)
+- [x] Threaded replies to prompt responses
+- [x] Banner shows response content with reply counts
+- [ ] Realtime updates when group members respond to prompts
 
-### Social Features
-- [ ] Group activity feed
-- [ ] Reaction and emoji support
+### Chat Experience
+- [x] Message replies to any message (iMessage-style ghost preview, scroll-to-original)
+- [x] Smart conversation-start timestamps (replace per-message times)
+- [ ] Reactions and emoji support on messages
+- [ ] Chat games and interactive prompts (polls, would-you-rather, etc.)
+- [ ] Read receipts / typing indicators
+
+### Engagement & Notifications
+- [ ] Push notifications for new messages and prompts
+- [ ] Smart nudges when a group goes quiet
+- [ ] Streak tracking for group activity
 
 ### Platform Expansion
 - [ ] iOS native app
@@ -37,4 +54,4 @@ See `/milestones/` for detailed retrospectives on each.
 
 ---
 
-*Last updated: 2026-02-09*
+*Last updated: 2026-02-16*

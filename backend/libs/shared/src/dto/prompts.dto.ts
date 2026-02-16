@@ -90,3 +90,60 @@ export class FeedListDto {
   @ApiProperty({ type: [FeedItemDto] })
   responses!: FeedItemDto[];
 }
+
+// ─── Group Prompt Today ───────────────────────────────────
+
+export class GroupPromptRespondentDto {
+  @ApiProperty({ format: 'uuid' })
+  userId!: string;
+
+  @ApiPropertyOptional({ example: 'Alex Chen' })
+  displayName!: string | null;
+
+  @ApiPropertyOptional({ example: 'https://example.com/avatar.jpg' })
+  avatarUrl!: string | null;
+
+  @ApiProperty({ format: 'uuid', description: 'Prompt response ID' })
+  responseId!: string;
+
+  @ApiProperty({ example: 'Pizza from that place downtown!' })
+  content!: string;
+
+  @ApiProperty()
+  createdAt!: string;
+
+  @ApiProperty({ description: 'Number of replies to this response' })
+  replyCount!: number;
+}
+
+export class GroupPromptTodayDto {
+  @ApiProperty({ type: PromptDto })
+  prompt!: PromptDto;
+
+  @ApiProperty({ description: 'Whether the current user has already answered' })
+  hasResponded!: boolean;
+
+  @ApiProperty({ type: [GroupPromptRespondentDto] })
+  respondents!: GroupPromptRespondentDto[];
+}
+
+// ─── Prompt Response Replies ─────────────────────────────
+
+export class PromptResponseReplyDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ type: () => FeedUserDto })
+  sender!: { id: string; displayName: string | null; avatarUrl: string | null };
+
+  @ApiProperty({ example: 'That sounds amazing!' })
+  content!: string;
+
+  @ApiProperty()
+  createdAt!: string;
+}
+
+export class PromptResponseRepliesListDto {
+  @ApiProperty({ type: [PromptResponseReplyDto] })
+  replies!: PromptResponseReplyDto[];
+}
