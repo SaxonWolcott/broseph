@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsOptional, IsString, IsUrl, IsUUID, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { LIMITS } from '../constants/limits';
 
 // ─── Request DTOs ────────────────────────────────────────
@@ -9,15 +9,24 @@ export class SubmitPromptResponseDto {
   @IsUUID()
   groupId!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Pizza from that place downtown — absolutely incredible!',
-    description: 'The response content',
+    description: 'The response content (required for text prompts)',
     maxLength: LIMITS.MAX_MESSAGE_LENGTH,
   })
+  @ValidateIf((o) => !o.imageUrl)
   @IsString()
   @MinLength(1)
   @MaxLength(LIMITS.MAX_MESSAGE_LENGTH)
-  content!: string;
+  content?: string;
+
+  @ApiPropertyOptional({
+    example: 'https://example.com/image.jpg',
+    description: 'Image URL for image prompt responses',
+  })
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  imageUrl?: string;
 }
 
 // ─── Response DTOs ───────────────────────────────────────
@@ -31,6 +40,9 @@ export class PromptDto {
 
   @ApiPropertyOptional({ example: 'icebreaker' })
   category?: string;
+
+  @ApiProperty({ example: 'text', enum: ['text', 'image'] })
+  responseType!: 'text' | 'image';
 }
 
 export class PendingPromptDto {
@@ -82,6 +94,9 @@ export class FeedItemDto {
   @ApiProperty({ example: 'Pizza from that place downtown!' })
   content!: string;
 
+  @ApiPropertyOptional({ example: 'https://example.com/image.jpg', nullable: true })
+  imageUrl!: string | null;
+
   @ApiProperty()
   createdAt!: string;
 }
@@ -108,6 +123,9 @@ export class GroupPromptRespondentDto {
 
   @ApiProperty({ example: 'Pizza from that place downtown!' })
   content!: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/image.jpg', nullable: true })
+  imageUrl!: string | null;
 
   @ApiProperty()
   createdAt!: string;

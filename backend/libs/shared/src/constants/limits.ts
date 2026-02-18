@@ -4,6 +4,8 @@ export const LIMITS = {
   MAX_MESSAGE_LENGTH: 2000,
   MAX_GROUP_NAME_LENGTH: 50,
   INVITE_EXPIRY_DAYS: 7,
+  MAX_IMAGE_SIZE_BYTES: 5 * 1024 * 1024, // 5MB
+  MAX_IMAGES_PER_MESSAGE: 10,
 } as const;
 
 export type Limits = typeof LIMITS;

@@ -16,6 +16,7 @@ interface MessageListProps {
   fetchNextPage: () => void;
   onReplyToPromptResponse?: (responseId: string, senderName: string, replyInChat: boolean) => void;
   onReplyToMessage?: (message: Message) => void;
+  onImageExpand?: (urls: string[], startIndex: number) => void;
 }
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -148,6 +149,8 @@ function MessageReplyGhost({
 
   const name = replyToPreview.senderName || 'Unknown';
   const avatarLetter = name.charAt(0).toUpperCase();
+  const imageUrls = replyToPreview.imageUrls;
+  const imageCount = imageUrls?.length ?? 0;
 
   return (
     <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
@@ -166,9 +169,27 @@ function MessageReplyGhost({
           />
           <div className="min-w-0 flex-1">
             <span className="text-[10px] text-default-400 font-medium">{name}</span>
-            <p className="text-[11px] text-default-400 line-clamp-2 leading-tight">
-              {replyToPreview.content}
-            </p>
+            {imageCount > 0 ? (
+              <div className="flex items-center gap-1 mt-0.5">
+                <img
+                  src={imageUrls![0]}
+                  alt=""
+                  className="w-8 h-8 object-cover rounded"
+                />
+                {imageCount > 1 && (
+                  <span className="text-[10px] text-default-400 font-medium">+{imageCount - 1}</span>
+                )}
+                {replyToPreview.content && !replyToPreview.content.startsWith('[') && (
+                  <p className="text-[11px] text-default-400 line-clamp-1 leading-tight">
+                    {replyToPreview.content}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-[11px] text-default-400 line-clamp-2 leading-tight">
+                {replyToPreview.content}
+              </p>
+            )}
           </div>
         </div>
         {/* Connecting line */}
@@ -190,6 +211,7 @@ export function MessageList({
   fetchNextPage,
   onReplyToPromptResponse,
   onReplyToMessage,
+  onImageExpand,
 }: MessageListProps) {
   const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -354,6 +376,7 @@ export function MessageList({
                 onReply={onReplyToMessage}
                 isSelected={selectedMessageId === message.id}
                 onSelect={setSelectedMessageId}
+                onImageExpand={onImageExpand}
               />
             </div>
           );

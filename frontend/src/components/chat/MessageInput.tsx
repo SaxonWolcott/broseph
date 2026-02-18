@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Textarea, Button } from '@heroui/react';
+import { Textarea, Button, Popover, PopoverTrigger, PopoverContent } from '@heroui/react';
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_IMAGES = 10;
 
 export interface ReplyContext {
   responseId?: string;      // For prompt response comments/replies
@@ -10,7 +13,7 @@ export interface ReplyContext {
 }
 
 interface MessageInputProps {
-  onSend: (content: string) => void;
+  onSend: (content: string, imageFiles?: File[]) => void;
   isLoading?: boolean;
   maxLength?: number;
   replyContext?: ReplyContext | null;
@@ -25,7 +28,11 @@ export function MessageInput({
   onCancelReply,
 }: MessageInputProps) {
   const [content, setContent] = useState('');
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -42,12 +49,60 @@ export function MessageInput({
     }
   }, [replyContext]);
 
+  // Cleanup all blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      imagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const remaining = MAX_IMAGES - selectedImages.length;
+    if (remaining <= 0) return;
+
+    const validFiles: File[] = [];
+    for (const file of files.slice(0, remaining)) {
+      if (file.size > MAX_IMAGE_SIZE) {
+        continue; // Skip oversized files
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) return;
+
+    const newUrls = validFiles.map((f) => URL.createObjectURL(f));
+    setSelectedImages((prev) => [...prev, ...validFiles]);
+    setImagePreviewUrls((prev) => [...prev, ...newUrls]);
+
+    // Reset file input so same file can be re-selected
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeImage = (index: number) => {
+    URL.revokeObjectURL(imagePreviewUrls[index]);
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviewUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = () => {
     const trimmed = content.trim();
-    if (!trimmed || trimmed.length > maxLength) return;
+    if (!trimmed && selectedImages.length === 0) return;
+    if (trimmed.length > maxLength) return;
 
-    onSend(trimmed);
+    onSend(trimmed, selectedImages.length > 0 ? selectedImages : undefined);
     setContent('');
+    // Clear images without revoking — useSendMessage will use them
+    setSelectedImages([]);
+    setImagePreviewUrls((prev) => {
+      prev.forEach((url) => URL.revokeObjectURL(url));
+      return [];
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -60,6 +115,7 @@ export function MessageInput({
   const isOverLimit = content.length > maxLength;
   const charCount = content.length;
   const showCharCount = content.length > maxLength * 0.8;
+  const canSend = (content.trim().length > 0 || selectedImages.length > 0) && !isOverLimit && !isLoading;
 
   return (
     <div className="border-t border-divider">
@@ -110,8 +166,111 @@ export function MessageInput({
         </div>
       )}
 
+      {/* Image preview row */}
+      {imagePreviewUrls.length > 0 && (
+        <div className="px-3 pt-2 pb-1">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {imagePreviewUrls.map((url, index) => (
+              <div key={url} className="relative flex-shrink-0">
+                <img
+                  src={url}
+                  alt={`Selected image ${index + 1}`}
+                  className="w-16 h-16 object-cover rounded-lg border border-divider"
+                />
+                <button
+                  type="button"
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-default-200 hover:bg-default-300 rounded-full flex items-center justify-center"
+                  onClick={() => removeImage(index)}
+                  aria-label={`Remove image ${index + 1}`}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2.5}
+                    stroke="currentColor"
+                    className="w-3 h-3"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+          <span className="text-[10px] text-default-400">
+            {selectedImages.length}/{MAX_IMAGES} images
+          </span>
+        </div>
+      )}
+
       <div className="p-3">
         <div className="flex items-end gap-2">
+          {/* + button with popover */}
+          <Popover
+            placement="top"
+            isOpen={isPopoverOpen}
+            onOpenChange={setIsPopoverOpen}
+          >
+            <PopoverTrigger>
+              <Button
+                isIconOnly
+                variant="light"
+                size="sm"
+                className="flex-shrink-0 mb-0.5"
+                aria-label="Attach"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="w-5 h-5"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent>
+              <div className="py-1">
+                <button
+                  type="button"
+                  className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-default-100 rounded-lg transition-colors"
+                  onClick={() => {
+                    setIsPopoverOpen(false);
+                    fileInputRef.current?.click();
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="w-4 h-4 text-primary"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z"
+                    />
+                  </svg>
+                  Images
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Hidden file input — multiple */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            multiple
+            className="hidden"
+            onChange={handleImageSelect}
+          />
+
           <div className="flex-1 relative">
             <Textarea
               ref={textareaRef}
@@ -139,7 +298,7 @@ export function MessageInput({
             isIconOnly
             color="primary"
             onPress={handleSubmit}
-            isDisabled={!content.trim() || isOverLimit || isLoading}
+            isDisabled={!canSend}
             aria-label="Send message"
           >
             <svg

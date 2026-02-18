@@ -6,10 +6,8 @@ import { SupabaseService, SendMessageJobDto, LIMITS } from '@app/shared';
 export class MessagesHandler {
   private readonly logger = new Logger(MessagesHandler.name);
 
-  constructor(private supabaseService: SupabaseService) {}
-
   async handleSendMessage(job: Job<SendMessageJobDto>): Promise<{ messageId: string }> {
-    const { groupId, senderId, content, promptResponseId, replyInChat, replyToId } = job.data;
+    const { groupId, senderId, content, promptResponseId, replyInChat, replyToId, imageUrls } = job.data;
     this.logger.log(`Sending message to group ${groupId} from user ${senderId}`);
 
     const adminClient = this.supabaseService.getAdminClient();
@@ -26,12 +24,15 @@ export class MessagesHandler {
       throw new Error('User is not a member of this group');
     }
 
-    // Validate content length
-    if (!content || content.trim().length === 0) {
-      throw new Error('Message content cannot be empty');
+    // Validate: must have content or images
+    const hasContent = content && content.trim().length > 0;
+    const hasImages = !!imageUrls && imageUrls.length > 0;
+
+    if (!hasContent && !hasImages) {
+      throw new Error('Message must have content or images');
     }
 
-    if (content.length > LIMITS.MAX_MESSAGE_LENGTH) {
+    if (hasContent && content.length > LIMITS.MAX_MESSAGE_LENGTH) {
       throw new Error(`Message exceeds maximum length of ${LIMITS.MAX_MESSAGE_LENGTH} characters`);
     }
 
@@ -44,10 +45,11 @@ export class MessagesHandler {
       .insert({
         group_id: groupId,
         sender_id: senderId,
-        content: content.trim(),
+        content: hasContent ? content.trim() : '',
         prompt_response_id: promptResponseId ?? null,
         reply_to_id: replyToId ?? null,
         type: messageType,
+        image_urls: hasImages ? imageUrls : null,
       })
       .select('id')
       .single();
@@ -60,4 +62,6 @@ export class MessagesHandler {
     this.logger.log(`Message ${message.id} sent to group ${groupId}`);
     return { messageId: message.id };
   }
+
+  constructor(private supabaseService: SupabaseService) {}
 }

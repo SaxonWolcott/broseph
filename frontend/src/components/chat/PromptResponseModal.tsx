@@ -99,9 +99,17 @@ export function PromptResponseModal({
                   {formatDateTime(message.createdAt)}
                 </span>
               </div>
-              <p className="text-sm whitespace-pre-wrap break-words mt-1">
-                {promptData.responseContent}
-              </p>
+              {message.imageUrls && message.imageUrls.length > 0 ? (
+                <img
+                  src={message.imageUrls[0]}
+                  alt="Response"
+                  className="max-w-full max-h-[300px] rounded-xl object-cover mt-1 cursor-pointer"
+                />
+              ) : (
+                <p className="text-sm whitespace-pre-wrap break-words mt-1">
+                  {promptData.responseContent}
+                </p>
+              )}
             </div>
           </div>
         </ModalHeader>

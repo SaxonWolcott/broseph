@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button, Textarea, Chip, Avatar, Spinner } from '@heroui/react';
 import { Prompt, PromptRespondent } from '../../types/prompts';
 import { usePromptResponseReplies } from '../../hooks/usePromptResponseReplies';
@@ -49,7 +49,7 @@ interface PromptBannerProps {
   hasResponded: boolean;
   respondents: PromptRespondent[];
   totalMembers: number;
-  onSubmitResponse: (content: string) => void;
+  onSubmitResponse: (content: string, imageFile?: File) => void;
   isSubmitting: boolean;
   onReplyToResponse?: (responseId: string, senderName: string, replyInChat: boolean) => void;
 }
@@ -66,13 +66,44 @@ export function PromptBanner({
   const [isExpanded, setIsExpanded] = useState(false);
   const [responseText, setResponseText] = useState('');
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isImagePrompt = prompt.responseType === 'image';
 
   const handleSubmit = () => {
-    const trimmed = responseText.trim();
-    if (!trimmed) return;
-    onSubmitResponse(trimmed);
-    setResponseText('');
-    setIsExpanded(false);
+    if (isImagePrompt) {
+      if (!selectedImage) return;
+      onSubmitResponse('', selectedImage);
+      // Don't clear image state — keep preview visible while uploading.
+      // The banner will update when hasResponded flips to true.
+    } else {
+      const trimmed = responseText.trim();
+      if (!trimmed) return;
+      onSubmitResponse(trimmed);
+      setResponseText('');
+      setIsExpanded(false);
+    }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSelectedImage(file);
+    const url = URL.createObjectURL(file);
+    setImagePreview(url);
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+      setImagePreview(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const toggleComments = (responseId: string) => {
@@ -103,9 +134,19 @@ export function PromptBanner({
               <span className="text-xs font-medium">
                 {r.displayName || 'Unknown'}
               </span>
-              <p className="text-xs text-default-500 line-clamp-3 mt-0.5">
-                {r.content}
-              </p>
+
+              {/* Show image thumbnail or text content */}
+              {r.imageUrl ? (
+                <img
+                  src={r.imageUrl}
+                  alt={`${r.displayName}'s response`}
+                  className="w-16 h-16 rounded-lg object-cover mt-1"
+                />
+              ) : (
+                <p className="text-xs text-default-500 line-clamp-3 mt-0.5">
+                  {r.content}
+                </p>
+              )}
 
               {/* Comment + Reply in chat + Show comments */}
               <div className="flex items-center gap-3 mt-1.5">
@@ -170,21 +211,43 @@ export function PromptBanner({
         className="w-full flex items-center gap-2 px-4 py-2.5 text-left"
         onClick={() => setIsExpanded((v) => !v)}
       >
-        {/* Lightbulb icon */}
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-          className="w-4 h-4 text-warning flex-shrink-0"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"
-          />
-        </svg>
+        {/* Lightbulb / Camera icon */}
+        {isImagePrompt ? (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            className="w-4 h-4 text-warning flex-shrink-0"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
+            />
+          </svg>
+        ) : (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            className="w-4 h-4 text-warning flex-shrink-0"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"
+            />
+          </svg>
+        )}
 
         {hasResponded ? (
           <span className="flex-1 text-sm text-success truncate flex items-center gap-1.5">
@@ -229,34 +292,94 @@ export function PromptBanner({
         <div className="px-4 pb-3 space-y-3">
           {/* Category + full prompt text */}
           <div className="space-y-1.5">
-            {prompt.category && (
-              <Chip size="sm" variant="dot" className="text-xs">
-                {prompt.category}
-              </Chip>
-            )}
+            <div className="flex items-center gap-1.5">
+              {prompt.category && (
+                <Chip size="sm" variant="dot" className="text-xs">
+                  {prompt.category}
+                </Chip>
+              )}
+              {isImagePrompt && (
+                <Chip size="sm" variant="flat" color="warning" className="text-xs">
+                  Photo
+                </Chip>
+              )}
+            </div>
             <p className="text-sm font-medium">{prompt.text}</p>
           </div>
 
           {/* Response input (only if not yet answered) */}
           {!hasResponded && (
             <div className="space-y-2">
-              <Textarea
-                placeholder="Your response..."
-                value={responseText}
-                onChange={(e) => setResponseText(e.target.value)}
-                minRows={2}
-                maxRows={4}
-                classNames={{
-                  inputWrapper: 'bg-default-200',
-                }}
-              />
+              {isImagePrompt ? (
+                /* Image picker UI */
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageSelect}
+                  />
+
+                  {imagePreview ? (
+                    <div className="relative inline-block">
+                      <img
+                        src={imagePreview}
+                        alt="Selected"
+                        className="max-w-full max-h-[200px] rounded-xl object-cover"
+                      />
+                      <button
+                        type="button"
+                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+                        onClick={handleRemoveImage}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="w-full flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed border-default-300 text-default-400 hover:border-primary hover:text-primary transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
+                        />
+                      </svg>
+                      <span className="text-sm">Tap to choose a photo</span>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                /* Text input UI */
+                <Textarea
+                  placeholder="Your response..."
+                  value={responseText}
+                  onChange={(e) => setResponseText(e.target.value)}
+                  minRows={2}
+                  maxRows={4}
+                  classNames={{
+                    inputWrapper: 'bg-default-200',
+                  }}
+                />
+              )}
               <div className="flex justify-end">
                 <Button
                   size="sm"
                   color="primary"
                   onPress={handleSubmit}
                   isLoading={isSubmitting}
-                  isDisabled={!responseText.trim()}
+                  isDisabled={isImagePrompt ? !selectedImage : !responseText.trim()}
                 >
                   Submit
                 </Button>

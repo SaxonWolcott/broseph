@@ -18,6 +18,7 @@ export interface ReplyToPreview {
   senderName: string | null;
   senderAvatarUrl: string | null;
   content: string;
+  imageUrls?: string[] | null;
 }
 
 export interface Message {
@@ -30,6 +31,7 @@ export interface Message {
   promptResponseId?: string | null;
   promptData?: PromptData | null;
   replyCount?: number | null;
+  imageUrls?: string[] | null;
   replyToId?: string | null;
   replyToPreview?: ReplyToPreview | null;
   // For optimistic updates
@@ -44,7 +46,8 @@ export interface MessageListResponse {
 }
 
 export interface SendMessageRequest {
-  content: string;
+  content?: string;
+  imageUrls?: string[];
   promptResponseId?: string;
   replyInChat?: boolean;
   replyToId?: string;

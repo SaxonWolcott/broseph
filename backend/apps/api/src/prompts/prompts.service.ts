@@ -79,6 +79,7 @@ export class PromptsService {
           id: samplePrompt.id,
           text: samplePrompt.text,
           category: samplePrompt.category,
+          responseType: samplePrompt.responseType,
         },
       });
     }
@@ -114,7 +115,7 @@ export class PromptsService {
     // 2. Fetch recent responses (no joins — avoids PostgREST FK resolution issues)
     const { data: rawResponses, error: feedError } = await adminClient
       .from('prompt_responses')
-      .select('id, group_id, user_id, prompt_id, content, created_at')
+      .select('id, group_id, user_id, prompt_id, content, image_url, created_at')
       .in('group_id', groupIds)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -158,8 +159,8 @@ export class PromptsService {
       return {
         id: r.id,
         prompt: samplePrompt
-          ? { id: samplePrompt.id, text: samplePrompt.text, category: samplePrompt.category }
-          : { id: r.prompt_id, text: 'Unknown prompt' },
+          ? { id: samplePrompt.id, text: samplePrompt.text, category: samplePrompt.category, responseType: samplePrompt.responseType }
+          : { id: r.prompt_id, text: 'Unknown prompt', responseType: 'text' as const },
         user: {
           id: r.user_id,
           displayName: profile?.display_name ?? null,
@@ -168,6 +169,7 @@ export class PromptsService {
         groupId: r.group_id,
         groupName: group?.name ?? 'Unknown',
         content: r.content,
+        imageUrl: r.image_url ?? null,
         createdAt: r.created_at,
       };
     });
@@ -182,6 +184,7 @@ export class PromptsService {
     userId: string,
     groupId: string,
     content: string,
+    imageUrl?: string,
   ): Promise<{ id: string; status: string }> {
     const adminClient = this.supabaseService.getAdminClient();
     const today = new Date();
@@ -210,7 +213,8 @@ export class PromptsService {
         user_id: userId,
         prompt_id: samplePrompt.id,
         response_date: todayStr,
-        content,
+        content: content || '',
+        image_url: imageUrl || null,
       })
       .select('id')
       .single();
@@ -228,9 +232,10 @@ export class PromptsService {
       id: generateId(),
       group_id: groupId,
       sender_id: userId,
-      content: content,
+      content: content || '',
       type: 'prompt_response',
       prompt_response_id: inserted.id,
+      image_urls: imageUrl ? [imageUrl] : null,
     });
 
     return { id: inserted.id, status: 'created' };
@@ -262,7 +267,7 @@ export class PromptsService {
     // 3. Query prompt_responses for today + this group (with content)
     const { data: responses, error: responsesError } = await adminClient
       .from('prompt_responses')
-      .select('id, user_id, content, created_at')
+      .select('id, user_id, content, image_url, created_at')
       .eq('group_id', groupId)
       .eq('response_date', todayStr);
 
@@ -281,6 +286,7 @@ export class PromptsService {
       avatarUrl: string | null;
       responseId: string;
       content: string;
+      imageUrl: string | null;
       createdAt: string;
       replyCount: number;
     }> = [];
@@ -323,6 +329,7 @@ export class PromptsService {
           avatarUrl: profile?.avatar_url ?? null,
           responseId: r.id,
           content: r.content,
+          imageUrl: r.image_url ?? null,
           createdAt: r.created_at,
           replyCount: replyCountMap.get(r.id) || 0,
         };
@@ -334,6 +341,7 @@ export class PromptsService {
         id: samplePrompt.id,
         text: samplePrompt.text,
         category: samplePrompt.category,
+        responseType: samplePrompt.responseType,
       },
       hasResponded,
       respondents,

@@ -71,11 +71,12 @@ export class MessagesController {
       {
         groupId,
         senderId: user.id,
-        content: dto.content,
+        content: dto.content ?? '',
         clientMessageId: jobId, // Use jobId as client correlation ID
         promptResponseId: dto.promptResponseId,
         replyInChat: dto.replyInChat,
         replyToId: dto.replyToId,
+        imageUrls: dto.imageUrls,
       },
       { jobId },
     );

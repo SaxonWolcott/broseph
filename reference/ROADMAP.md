@@ -22,6 +22,9 @@ Broseph is the group chat you wish you had with your friends. Not a social media
 - **012: Comprehensive README** — Full project documentation for independent study review
 - **013: Group Chat Restructure** — Pivoted to group-chat-centric design, prompts as header banner in chat
 - **014: Prompt Responses in Chat** — In-chat cards, comments, reply-in-chat (iMessage-style), reply to any message, smart timestamps
+- **015: Image Messaging** — Image attachments in chat, + menu, preview before send, inline rendering, full-screen expand, reply support
+- **016: Multi-Image Messaging** — Up to 10 images per message, card stack UI with hover arrows, gallery modal, batch upload
+- **017: Image Prompts** — Image prompt type with photo picker, image responses in banner/cards/modal, DB support for image_url
 
 See `/milestones/` for detailed retrospectives on each.
 
@@ -38,6 +41,8 @@ See `/milestones/` for detailed retrospectives on each.
 ### Chat Experience
 - [x] Message replies to any message (iMessage-style ghost preview, scroll-to-original)
 - [x] Smart conversation-start timestamps (replace per-message times)
+- [x] Image messaging (+ menu, preview, inline bubbles, full-screen expand)
+- [x] Multi-image messaging (up to 10 per message, card stack, gallery modal)
 - [ ] Reactions and emoji support on messages
 - [ ] Chat games and interactive prompts (polls, would-you-rather, etc.)
 - [ ] Read receipts / typing indicators
@@ -54,4 +59,4 @@ See `/milestones/` for detailed retrospectives on each.
 
 ---
 
-*Last updated: 2026-02-16*
+*Last updated: 2026-02-18*

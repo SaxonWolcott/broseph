@@ -2,12 +2,14 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsString,
   MaxLength,
-  MinLength,
   IsOptional,
   IsUUID,
   IsInt,
   Min,
   Max,
+  IsUrl,
+  IsArray,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { IsBoolean } from 'class-validator';
@@ -16,15 +18,25 @@ import { LIMITS } from '../constants/limits';
 // Request DTOs
 
 export class SendMessageDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Hello everyone!',
-    description: 'Message content',
+    description: 'Message content (required if no images)',
     maxLength: LIMITS.MAX_MESSAGE_LENGTH,
   })
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(LIMITS.MAX_MESSAGE_LENGTH)
-  content!: string;
+  content?: string;
+
+  @ApiPropertyOptional({
+    description: 'URLs of uploaded image attachments (max 10)',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(LIMITS.MAX_IMAGES_PER_MESSAGE)
+  @IsUrl({ require_tld: false }, { each: true })
+  imageUrls?: string[];
 
   @ApiPropertyOptional({
     description: 'Prompt response ID to reply to',
@@ -126,6 +138,9 @@ export class MessageDto {
   @ApiPropertyOptional({ description: 'Number of comments on this prompt response' })
   replyCount!: number | null;
 
+  @ApiPropertyOptional({ description: 'URLs of attached images', type: [String] })
+  imageUrls!: string[] | null;
+
   @ApiPropertyOptional({ format: 'uuid', description: 'Message this is a reply to' })
   replyToId!: string | null;
 
@@ -134,6 +149,7 @@ export class MessageDto {
     senderName: string | null;
     senderAvatarUrl: string | null;
     content: string;
+    imageUrls?: string[] | null;
   } | null;
 }
 

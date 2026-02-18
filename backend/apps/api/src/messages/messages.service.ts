@@ -64,6 +64,7 @@ export class MessagesService {
         type,
         prompt_response_id,
         reply_to_id,
+        image_urls,
         sender:sender_id (
           id,
           display_name,
@@ -154,18 +155,18 @@ export class MessagesService {
       .map((m) => m.reply_to_id as string);
 
     const uniqueReplyToIds = [...new Set(replyToIds)];
-    let replyToMap = new Map<string, { content: string; sender_id: string | null }>();
+    let replyToMap = new Map<string, { content: string; sender_id: string | null; image_urls: string[] | null }>();
     let replyToSenderMap = new Map<string, { display_name: string | null; avatar_url: string | null }>();
 
     if (uniqueReplyToIds.length > 0) {
       const adminClient2 = this.supabaseService.getAdminClient();
       const { data: replyToMessages } = await adminClient2
         .from('messages')
-        .select('id, content, sender_id')
+        .select('id, content, sender_id, image_urls')
         .in('id', uniqueReplyToIds);
 
       replyToMap = new Map(
-        (replyToMessages || []).map((rm) => [rm.id, { content: rm.content, sender_id: rm.sender_id }]),
+        (replyToMessages || []).map((rm) => [rm.id, { content: rm.content, sender_id: rm.sender_id, image_urls: rm.image_urls }]),
       );
 
       // Fetch sender profiles for reply-to messages
@@ -236,13 +237,20 @@ export class MessagesService {
         const replyToMsg = replyToMap.get(replyToId);
         if (replyToMsg) {
           const rtSender = replyToMsg.sender_id ? replyToSenderMap.get(replyToMsg.sender_id) : null;
+          const imageCount = replyToMsg.image_urls?.length ?? 0;
+          const previewContent = replyToMsg.content && replyToMsg.content.length > 0
+            ? (replyToMsg.content.length > 100 ? replyToMsg.content.slice(0, 100) + '...' : replyToMsg.content)
+            : (imageCount === 1 ? '[Image]' : imageCount > 1 ? `[${imageCount} images]` : '');
           replyToPreview = {
             senderName: rtSender?.display_name ?? null,
             senderAvatarUrl: rtSender?.avatar_url ?? null,
-            content: replyToMsg.content.length > 100 ? replyToMsg.content.slice(0, 100) + '...' : replyToMsg.content,
+            content: previewContent,
+            imageUrls: replyToMsg.image_urls ?? null,
           };
         }
       }
+
+      const imageUrls = (m as unknown as { image_urls: string[] | null }).image_urls ?? null;
 
       return {
         id: m.id,
@@ -254,6 +262,7 @@ export class MessagesService {
         promptResponseId,
         promptData,
         replyCount,
+        imageUrls,
         replyToId,
         replyToPreview,
       };

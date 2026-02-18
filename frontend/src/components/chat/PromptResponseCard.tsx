@@ -75,9 +75,17 @@ export function PromptResponseCard({
                 {formatTime(message.createdAt)}
               </span>
             </div>
-            <p className="text-sm whitespace-pre-wrap break-words mt-0.5">
-              {promptData.responseContent}
-            </p>
+            {message.imageUrls && message.imageUrls.length > 0 ? (
+              <img
+                src={message.imageUrls[0]}
+                alt="Response"
+                className="max-w-full max-h-[200px] rounded-xl object-cover mt-1"
+              />
+            ) : (
+              <p className="text-sm whitespace-pre-wrap break-words mt-0.5">
+                {promptData.responseContent}
+              </p>
+            )}
           </div>
         </div>
 

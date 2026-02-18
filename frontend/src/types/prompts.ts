@@ -5,6 +5,7 @@ export interface Prompt {
   id: string;
   text: string;
   category?: string;
+  responseType?: 'text' | 'image';
 }
 
 /**
@@ -16,6 +17,7 @@ export interface PromptRespondent {
   avatarUrl: string | null;
   responseId: string;
   content: string;
+  imageUrl?: string | null;
   createdAt: string;
   replyCount: number;
 }
@@ -35,6 +37,7 @@ export interface GroupPromptTodayResponse {
 export interface SubmitPromptRequest {
   groupId: string;
   content: string;
+  imageUrl?: string;
 }
 
 /**

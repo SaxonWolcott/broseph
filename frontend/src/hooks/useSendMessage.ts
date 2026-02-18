@@ -3,24 +3,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { Message, MessageListResponse, SendMessageRequest } from '../types/messages';
 import { JobAcceptedResponse } from '../types/groups';
 import { messagesQueryKey } from './useMessages';
+import { useImageUpload } from './useImageUpload';
 
-async function sendMessage(
+async function postMessage(
   accessToken: string,
   groupId: string,
-  content: string,
-  promptResponseId?: string,
-  replyInChat?: boolean,
-  replyToId?: string,
+  body: SendMessageRequest,
 ): Promise<JobAcceptedResponse> {
-  const body: SendMessageRequest = { content };
-  if (promptResponseId) {
-    body.promptResponseId = promptResponseId;
-    body.replyInChat = replyInChat;
-  }
-  if (replyToId) {
-    body.replyToId = replyToId;
-  }
-
   const response = await fetch(`/api/groups/${groupId}/messages`, {
     method: 'POST',
     headers: {
@@ -41,6 +30,7 @@ async function sendMessage(
 interface SendMessageParams {
   groupId: string;
   content: string;
+  imageFiles?: File[];
   promptResponseId?: string;
   replyInChat?: boolean;
   replyToId?: string;
@@ -48,64 +38,93 @@ interface SendMessageParams {
 
 /**
  * Hook to send a message with optimistic updates.
+ * Supports multiple image attachments: uploads all images first,
+ * then sends ONE message with imageUrls + content.
  */
 export function useSendMessage() {
   const { session, user } = useAuth();
   const queryClient = useQueryClient();
   const accessToken = session?.access_token;
+  const { uploadImages } = useImageUpload();
 
   return useMutation({
-    mutationFn: ({ groupId, content, promptResponseId, replyInChat, replyToId }: SendMessageParams) =>
-      sendMessage(accessToken!, groupId, content, promptResponseId, replyInChat, replyToId),
+    mutationFn: async ({ groupId, content, imageFiles, promptResponseId, replyInChat, replyToId }: SendMessageParams) => {
+      const body: SendMessageRequest = {};
 
-    onMutate: async ({ groupId, content }) => {
-      // Cancel any outgoing refetches
+      // Upload images if present
+      if (imageFiles && imageFiles.length > 0) {
+        const imageUrls = await uploadImages(imageFiles, groupId);
+        body.imageUrls = imageUrls;
+      }
+
+      // Add text content if present
+      if (content.trim()) {
+        body.content = content.trim();
+      }
+
+      // Add reply context
+      if (promptResponseId) {
+        body.promptResponseId = promptResponseId;
+        body.replyInChat = replyInChat;
+      }
+      if (replyToId) {
+        body.replyToId = replyToId;
+      }
+
+      return postMessage(accessToken!, groupId, body);
+    },
+
+    onMutate: async ({ groupId, content, imageFiles }) => {
       await queryClient.cancelQueries({ queryKey: messagesQueryKey(groupId) });
 
-      // Snapshot the previous value
       const previousMessages = queryClient.getQueryData<
         InfiniteData<MessageListResponse>
       >(messagesQueryKey(groupId));
 
-      // Optimistically update
       if (previousMessages && user) {
-        const optimisticMessage: Message = {
-          id: `temp-${Date.now()}`,
-          groupId,
-          sender: {
-            id: user.id,
-            displayName: user.user_metadata?.display_name ?? null,
-            handle: user.user_metadata?.handle ?? null,
-            avatarUrl: user.user_metadata?.avatar_url ?? null,
-          },
-          content,
-          type: 'message',
-          createdAt: new Date().toISOString(),
-          pending: true,
-        };
+        // Create a single optimistic message with images + text
+        const hasImages = imageFiles && imageFiles.length > 0;
+        const hasContent = content.trim().length > 0;
 
-        queryClient.setQueryData<InfiniteData<MessageListResponse>>(
-          messagesQueryKey(groupId),
-          {
-            ...previousMessages,
-            pages: previousMessages.pages.map((page, index) => {
-              if (index === 0) {
-                return {
-                  ...page,
-                  messages: [optimisticMessage, ...page.messages],
-                };
-              }
-              return page;
-            }),
-          },
-        );
+        if (hasImages || hasContent) {
+          const optimisticMessage: Message = {
+            id: `temp-${Date.now()}`,
+            groupId,
+            sender: {
+              id: user.id,
+              displayName: user.user_metadata?.display_name ?? null,
+              handle: user.user_metadata?.handle ?? null,
+              avatarUrl: user.user_metadata?.avatar_url ?? null,
+            },
+            content: hasContent ? content.trim() : '',
+            imageUrls: hasImages ? imageFiles!.map((f) => URL.createObjectURL(f)) : null,
+            type: 'message',
+            createdAt: new Date().toISOString(),
+            pending: true,
+          };
+
+          queryClient.setQueryData<InfiniteData<MessageListResponse>>(
+            messagesQueryKey(groupId),
+            {
+              ...previousMessages,
+              pages: previousMessages.pages.map((page, index) => {
+                if (index === 0) {
+                  return {
+                    ...page,
+                    messages: [optimisticMessage, ...page.messages],
+                  };
+                }
+                return page;
+              }),
+            },
+          );
+        }
       }
 
       return { previousMessages, groupId };
     },
 
     onError: (_err, { groupId }, context) => {
-      // Rollback on error
       if (context?.previousMessages) {
         queryClient.setQueryData(
           messagesQueryKey(groupId),
@@ -115,12 +134,27 @@ export function useSendMessage() {
     },
 
     onSettled: (_data, _error, { groupId, promptResponseId }) => {
-      // Refetch to get the real message
+      // Revoke any blob URLs from optimistic messages
+      const currentData = queryClient.getQueryData<InfiniteData<MessageListResponse>>(
+        messagesQueryKey(groupId),
+      );
+      if (currentData) {
+        for (const page of currentData.pages) {
+          for (const msg of page.messages) {
+            if (msg.imageUrls) {
+              for (const url of msg.imageUrls) {
+                if (url.startsWith('blob:')) {
+                  URL.revokeObjectURL(url);
+                }
+              }
+            }
+          }
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: messagesQueryKey(groupId) });
-      // Invalidate reply cache if this was a reply
       if (promptResponseId) {
         queryClient.invalidateQueries({ queryKey: ['prompts', 'responses', promptResponseId, 'replies'] });
-        // Also invalidate the prompt data so reply counts update
         queryClient.invalidateQueries({ queryKey: ['prompts', 'group'] });
       }
     },

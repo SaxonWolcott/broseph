@@ -6,6 +6,7 @@ export interface SendMessageJobDto {
   promptResponseId?: string; // For replies to prompt responses
   replyInChat?: boolean; // true = visible in chat stream, false = popup only
   replyToId?: string; // General message reply
+  imageUrls?: string[]; // URLs of uploaded image attachments
 }
 
 export interface SendMessageJobResult {

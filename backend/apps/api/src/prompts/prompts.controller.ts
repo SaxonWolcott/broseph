@@ -56,7 +56,7 @@ export class PromptsController {
     @CurrentUser() user: User,
     @Body() dto: SubmitPromptResponseDto,
   ): Promise<{ id: string; status: string }> {
-    return this.promptsService.submitResponse(user.id, dto.groupId, dto.content);
+    return this.promptsService.submitResponse(user.id, dto.groupId, dto.content || '', dto.imageUrl);
   }
 
   @Get('group/:groupId/today')
