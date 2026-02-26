@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Put,
   Get,
   Body,
   Param,
@@ -19,8 +20,9 @@ import {
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { User } from '@supabase/supabase-js';
-import { SendMessageDto, MessagesQueryDto, MessageListDto } from '@app/shared';
+import { SendMessageDto, MessagesQueryDto, MessageListDto, ToggleReactionDto, ToggleReactionResponseDto } from '@app/shared';
 import { MessagesService } from './messages.service';
+import { ReactionsService } from './reactions.service';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import {
   CurrentUser,
@@ -41,6 +43,7 @@ class JobAcceptedDto {
 export class MessagesController {
   constructor(
     private messagesService: MessagesService,
+    private reactionsService: ReactionsService,
     @InjectQueue('broseph-jobs') private jobQueue: Queue,
   ) {}
 
@@ -102,9 +105,29 @@ export class MessagesController {
     // Validate membership
     await this.messagesService.validateMembership(groupId, user.id, token);
 
-    return this.messagesService.getMessages(groupId, token, {
+    return this.messagesService.getMessages(groupId, token, user.id, {
       cursor: query.cursor,
       limit: query.limit ?? 50,
     });
+  }
+
+  @Put(':messageId/reactions')
+  @ApiOperation({ summary: 'Toggle an emoji reaction on a message' })
+  @ApiResponse({
+    status: 200,
+    description: 'Reaction toggled',
+    type: ToggleReactionResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Not a member of this group' })
+  async toggleReaction(
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @Body() dto: ToggleReactionDto,
+  ): Promise<ToggleReactionResponseDto> {
+    await this.messagesService.validateMembership(groupId, user.id, token);
+    return this.reactionsService.toggleReaction(messageId, user.id, dto.emoji);
   }
 }

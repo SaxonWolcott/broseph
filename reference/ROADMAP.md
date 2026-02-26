@@ -25,6 +25,7 @@ Broseph is the group chat you wish you had with your friends. Not a social media
 - **015: Image Messaging** — Image attachments in chat, + menu, preview before send, inline rendering, full-screen expand, reply support
 - **016: Multi-Image Messaging** — Up to 10 images per message, card stack UI with hover arrows, gallery modal, batch upload
 - **017: Image Prompts** — Image prompt type with photo picker, image responses in banner/cards/modal, DB support for image_url
+- **018: Emoji Reactions** — Slack/Discord-style reactions on messages, quick-reaction bar, full emoji picker, optimistic updates, realtime sync
 
 See `/milestones/` for detailed retrospectives on each.
 
@@ -43,7 +44,7 @@ See `/milestones/` for detailed retrospectives on each.
 - [x] Smart conversation-start timestamps (replace per-message times)
 - [x] Image messaging (+ menu, preview, inline bubbles, full-screen expand)
 - [x] Multi-image messaging (up to 10 per message, card stack, gallery modal)
-- [ ] Reactions and emoji support on messages
+- [x] Reactions and emoji support on messages
 - [ ] Chat games and interactive prompts (polls, would-you-rather, etc.)
 - [ ] Read receipts / typing indicators
 
@@ -59,4 +60,4 @@ See `/milestones/` for detailed retrospectives on each.
 
 ---
 
-*Last updated: 2026-02-18*
+*Last updated: 2026-02-26*

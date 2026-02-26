@@ -17,6 +17,13 @@ import { LIMITS } from '../constants/limits';
 
 // Request DTOs
 
+export class ToggleReactionDto {
+  @ApiProperty({ example: '👍', description: 'Emoji to react with' })
+  @IsString()
+  @MaxLength(32)
+  emoji!: string;
+}
+
 export class SendMessageDto {
   @ApiPropertyOptional({
     example: 'Hello everyone!',
@@ -89,6 +96,25 @@ export class MessagesQueryDto {
 
 // Response DTOs
 
+export class ReactionDto {
+  @ApiProperty({ example: '👍' })
+  emoji!: string;
+
+  @ApiProperty({ example: 3 })
+  count!: number;
+
+  @ApiProperty({ description: 'Whether the current user has reacted with this emoji' })
+  hasReacted!: boolean;
+}
+
+export class ToggleReactionResponseDto {
+  @ApiProperty({ enum: ['added', 'removed'] })
+  action!: 'added' | 'removed';
+
+  @ApiProperty({ type: [ReactionDto] })
+  reactions!: ReactionDto[];
+}
+
 export class MessageSenderDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -151,6 +177,9 @@ export class MessageDto {
     content: string;
     imageUrls?: string[] | null;
   } | null;
+
+  @ApiPropertyOptional({ type: [ReactionDto], description: 'Aggregated reactions on this message' })
+  reactions!: ReactionDto[] | null;
 }
 
 export class MessageListDto {

@@ -12,10 +12,14 @@ import {
   ERROR_MESSAGES,
   SAMPLE_PROMPTS_MAP,
 } from '@app/shared';
+import { ReactionsService } from './reactions.service';
 
 @Injectable()
 export class MessagesService {
-  constructor(private supabaseService: SupabaseService) {}
+  constructor(
+    private supabaseService: SupabaseService,
+    private reactionsService: ReactionsService,
+  ) {}
 
   /**
    * Validate that user is a member of the group.
@@ -46,6 +50,7 @@ export class MessagesService {
   async getMessages(
     groupId: string,
     accessToken: string,
+    userId: string,
     options: { cursor?: string; limit: number },
   ): Promise<MessageListDto> {
     const userClient = this.supabaseService.getClientForUser(accessToken);
@@ -185,6 +190,10 @@ export class MessagesService {
       }
     }
 
+    // Batch-fetch reactions for all messages
+    const messageIds = resultMessages.map((m) => m.id);
+    const reactionsMap = await this.reactionsService.batchFetchReactions(messageIds, userId);
+
     const messageDtos: MessageDto[] = resultMessages.map((m) => {
       let sender: MessageSenderDto | null = null;
 
@@ -252,6 +261,8 @@ export class MessagesService {
 
       const imageUrls = (m as unknown as { image_urls: string[] | null }).image_urls ?? null;
 
+      const reactions = reactionsMap.get(m.id) ?? null;
+
       return {
         id: m.id,
         groupId: m.group_id,
@@ -265,6 +276,7 @@ export class MessagesService {
         imageUrls,
         replyToId,
         replyToPreview,
+        reactions,
       };
     });
 

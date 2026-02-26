@@ -16,6 +16,7 @@ interface MessageListProps {
   fetchNextPage: () => void;
   onReplyToPromptResponse?: (responseId: string, senderName: string, replyInChat: boolean) => void;
   onReplyToMessage?: (message: Message) => void;
+  onReactToMessage?: (messageId: string, emoji: string) => void;
   onImageExpand?: (urls: string[], startIndex: number) => void;
 }
 
@@ -211,6 +212,7 @@ export function MessageList({
   fetchNextPage,
   onReplyToPromptResponse,
   onReplyToMessage,
+  onReactToMessage,
   onImageExpand,
 }: MessageListProps) {
   const { user } = useAuth();
@@ -374,6 +376,7 @@ export function MessageList({
                 isOwn={isOwn}
                 showAvatar={showAvatar}
                 onReply={onReplyToMessage}
+                onReact={onReactToMessage}
                 isSelected={selectedMessageId === message.id}
                 onSelect={setSelectedMessageId}
                 onImageExpand={onImageExpand}

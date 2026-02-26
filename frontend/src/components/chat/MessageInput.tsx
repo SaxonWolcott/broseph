@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Textarea, Button, Popover, PopoverTrigger, PopoverContent } from '@heroui/react';
+import Picker from '@emoji-mart/react';
+import data from '@emoji-mart/data';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_IMAGES = 10;
@@ -31,8 +33,10 @@ export function MessageInput({
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -48,6 +52,20 @@ export function MessageInput({
       textareaRef.current.focus();
     }
   }, [replyContext]);
+
+  // Close emoji picker on outside click
+  useEffect(() => {
+    if (!isEmojiPickerOpen) return;
+
+    function handleClickOutside(e: MouseEvent) {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setIsEmojiPickerOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isEmojiPickerOpen]);
 
   // Cleanup all blob URLs on unmount
   useEffect(() => {
@@ -109,6 +127,25 @@ export function MessageInput({
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
+    }
+  };
+
+  const handleEmojiSelect = (emoji: { native: string }) => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart ?? content.length;
+      const end = textarea.selectionEnd ?? content.length;
+      const newContent = content.slice(0, start) + emoji.native + content.slice(end);
+      setContent(newContent);
+      // Restore cursor position after the inserted emoji
+      requestAnimationFrame(() => {
+        const pos = start + emoji.native.length;
+        textarea.selectionStart = pos;
+        textarea.selectionEnd = pos;
+        textarea.focus();
+      });
+    } else {
+      setContent((prev) => prev + emoji.native);
     }
   };
 
@@ -294,6 +331,34 @@ export function MessageInput({
               </span>
             )}
           </div>
+          {/* Emoji picker button */}
+          <div className="relative flex-shrink-0 mb-0.5" ref={emojiPickerRef}>
+            <Button
+              isIconOnly
+              variant="light"
+              size="sm"
+              onPress={() => setIsEmojiPickerOpen((prev) => !prev)}
+              aria-label="Emoji picker"
+              className={isEmojiPickerOpen ? 'text-primary' : ''}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 0 1-6.364 0M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Z" />
+              </svg>
+            </Button>
+            {isEmojiPickerOpen && (
+              <div className="absolute bottom-full right-0 mb-2 z-50">
+                <Picker
+                  data={data}
+                  onEmojiSelect={handleEmojiSelect}
+                  theme="dark"
+                  previewPosition="none"
+                  skinTonePosition="none"
+                  maxFrequentRows={1}
+                />
+              </div>
+            )}
+          </div>
+
           <Button
             isIconOnly
             color="primary"

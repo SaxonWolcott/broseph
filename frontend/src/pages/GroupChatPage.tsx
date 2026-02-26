@@ -8,6 +8,8 @@ import { useSendMessage } from '../hooks/useSendMessage';
 import { useLeaveGroup } from '../hooks/useLeaveGroup';
 import { useRealtimeMessages } from '../hooks/useRealtimeMessages';
 import { useRealtimeMembers } from '../hooks/useRealtimeMembers';
+import { useRealtimeReactions } from '../hooks/useRealtimeReactions';
+import { useToggleReaction } from '../hooks/useToggleReaction';
 import { useGroupPrompt } from '../hooks/useGroupPrompt';
 import { useSubmitPromptResponse } from '../hooks/useSubmitPromptResponse';
 import { useImageUpload } from '../hooks/useImageUpload';
@@ -42,9 +44,12 @@ export default function GroupChatPage() {
   const submitPromptResponse = useSubmitPromptResponse();
   const { uploadImage, isUploading } = useImageUpload();
 
+  const toggleReaction = useToggleReaction();
+
   // Real-time subscriptions for instant updates
   useRealtimeMessages(id);
   useRealtimeMembers(id);
+  useRealtimeReactions(id);
 
   const handleReplyToPromptResponse = useCallback((responseId: string, senderName: string, replyInChat: boolean) => {
     setReplyContext({ responseId, senderName, replyInChat });
@@ -84,6 +89,11 @@ export default function GroupChatPage() {
     });
     setReplyContext(null);
   };
+
+  const handleReactToMessage = useCallback((messageId: string, emoji: string) => {
+    if (!id) return;
+    toggleReaction.mutate({ groupId: id, messageId, emoji });
+  }, [id, toggleReaction]);
 
   const handleImageExpand = useCallback((urls: string[], startIndex: number) => {
     setGalleryImages(urls);
@@ -156,6 +166,7 @@ export default function GroupChatPage() {
         fetchNextPage={fetchNextPage}
         onReplyToPromptResponse={handleReplyToPromptResponse}
         onReplyToMessage={handleReplyToMessage}
+        onReactToMessage={handleReactToMessage}
         onImageExpand={handleImageExpand}
       />
 

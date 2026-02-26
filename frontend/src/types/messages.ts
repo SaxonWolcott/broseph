@@ -21,6 +21,17 @@ export interface ReplyToPreview {
   imageUrls?: string[] | null;
 }
 
+export interface Reaction {
+  emoji: string;
+  count: number;
+  hasReacted: boolean;
+}
+
+export interface ToggleReactionResponse {
+  action: 'added' | 'removed';
+  reactions: Reaction[];
+}
+
 export interface Message {
   id: string;
   groupId: string;
@@ -34,6 +45,7 @@ export interface Message {
   imageUrls?: string[] | null;
   replyToId?: string | null;
   replyToPreview?: ReplyToPreview | null;
+  reactions?: Reaction[] | null;
   // For optimistic updates
   pending?: boolean;
   error?: boolean;

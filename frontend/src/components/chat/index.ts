@@ -5,3 +5,6 @@ export * from './MessageInput';
 export * from './PromptBanner';
 export * from './PromptResponseCard';
 export * from './PromptResponseModal';
+export * from './ReactionPills';
+export * from './QuickReactionMenu';
+export * from './EmojiPickerPopover';
