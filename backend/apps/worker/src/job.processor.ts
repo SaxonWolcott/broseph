@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { GroupsHandler, MessagesHandler, MembersHandler } from './handlers';
+import { GroupsHandler, MessagesHandler, MembersHandler, PollsHandler } from './handlers';
 
 @Processor('broseph-jobs')
 export class JobProcessor extends WorkerHost {
@@ -11,6 +11,7 @@ export class JobProcessor extends WorkerHost {
     private groupsHandler: GroupsHandler,
     private messagesHandler: MessagesHandler,
     private membersHandler: MembersHandler,
+    private pollsHandler: PollsHandler,
   ) {
     super();
   }
@@ -41,6 +42,14 @@ export class JobProcessor extends WorkerHost {
           break;
         case 'accept-invite':
           result = await this.membersHandler.handleAcceptInvite(job);
+          break;
+
+        // Poll operations
+        case 'create-poll':
+          result = await this.pollsHandler.handleCreatePoll(job);
+          break;
+        case 'close-poll':
+          result = await this.pollsHandler.handleClosePoll(job);
           break;
 
         default:

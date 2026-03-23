@@ -145,8 +145,8 @@ export class MessageDto {
   @ApiProperty()
   createdAt!: string;
 
-  @ApiPropertyOptional({ default: 'message', enum: ['message', 'system', 'prompt_response'] })
-  type!: 'message' | 'system' | 'prompt_response';
+  @ApiPropertyOptional({ default: 'message', enum: ['message', 'system', 'prompt_response', 'poll'] })
+  type!: 'message' | 'system' | 'prompt_response' | 'poll';
 
   @ApiPropertyOptional({ format: 'uuid', description: 'Linked prompt response ID' })
   promptResponseId!: string | null;
@@ -180,6 +180,30 @@ export class MessageDto {
 
   @ApiPropertyOptional({ type: [ReactionDto], description: 'Aggregated reactions on this message' })
   reactions!: ReactionDto[] | null;
+
+  @ApiPropertyOptional({ description: 'Poll data (for poll type messages)' })
+  pollData!: {
+    id: string;
+    title: string;
+    options: {
+      id: string;
+      text: string;
+      position: number;
+      voteCount: number;
+      voters: { userId: string; displayName: string | null; avatarUrl: string | null }[] | null;
+      hasVoted: boolean;
+    }[];
+    allowMultiple: boolean;
+    showVotes: boolean;
+    allowAddOptions: boolean;
+    declareWinnerOnAllVoted: boolean;
+    closesAt: string | null;
+    closed: boolean;
+    closedReason: string | null;
+    winningOptionId: string | null;
+    creatorId: string;
+    totalVoters: number;
+  } | null;
 }
 
 export class MessageListDto {

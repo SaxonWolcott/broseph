@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { SupabaseModule } from '@app/shared';
 import { JobProcessor } from './job.processor';
-import { GroupsHandler, MessagesHandler, MembersHandler } from './handlers';
+import { GroupsHandler, MessagesHandler, MembersHandler, PollsHandler } from './handlers';
 
 @Module({
   imports: [
@@ -25,6 +25,6 @@ import { GroupsHandler, MessagesHandler, MembersHandler } from './handlers';
     }),
     SupabaseModule,
   ],
-  providers: [JobProcessor, GroupsHandler, MessagesHandler, MembersHandler],
+  providers: [JobProcessor, GroupsHandler, MessagesHandler, MembersHandler, PollsHandler],
 })
 export class WorkerModule {}

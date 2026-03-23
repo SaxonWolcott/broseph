@@ -8,3 +8,5 @@ export * from './PromptResponseModal';
 export * from './ReactionPills';
 export * from './QuickReactionMenu';
 export * from './EmojiPickerPopover';
+export * from './PollCard';
+export * from './CreatePollModal';

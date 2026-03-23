@@ -9,11 +9,16 @@ import { useLeaveGroup } from '../hooks/useLeaveGroup';
 import { useRealtimeMessages } from '../hooks/useRealtimeMessages';
 import { useRealtimeMembers } from '../hooks/useRealtimeMembers';
 import { useRealtimeReactions } from '../hooks/useRealtimeReactions';
+import { useRealtimePolls } from '../hooks/useRealtimePolls';
 import { useToggleReaction } from '../hooks/useToggleReaction';
+import { useCreatePoll } from '../hooks/useCreatePoll';
+import { useCastVote } from '../hooks/useCastVote';
+import { useClosePoll } from '../hooks/useClosePoll';
+import { useAddPollOption } from '../hooks/useAddPollOption';
 import { useGroupPrompt } from '../hooks/useGroupPrompt';
 import { useSubmitPromptResponse } from '../hooks/useSubmitPromptResponse';
 import { useImageUpload } from '../hooks/useImageUpload';
-import { ChatHeader, MessageList, MessageInput, PromptBanner } from '../components/chat';
+import { ChatHeader, MessageList, MessageInput, PromptBanner, CreatePollModal } from '../components/chat';
 import type { ReplyContext } from '../components/chat/MessageInput';
 import { MemberList } from '../components/members';
 import { InviteModal } from '../components/invites';
@@ -29,6 +34,7 @@ export default function GroupChatPage() {
   const [replyContext, setReplyContext] = useState<ReplyContext | null>(null);
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [isPollModalOpen, setIsPollModalOpen] = useState(false);
 
   const { data: group, isLoading: isGroupLoading, error: groupError } = useGroup(id);
   const {
@@ -45,11 +51,16 @@ export default function GroupChatPage() {
   const { uploadImage, isUploading } = useImageUpload();
 
   const toggleReaction = useToggleReaction();
+  const createPoll = useCreatePoll();
+  const castVote = useCastVote();
+  const closePoll = useClosePoll();
+  const addPollOption = useAddPollOption();
 
   // Real-time subscriptions for instant updates
   useRealtimeMessages(id);
   useRealtimeMembers(id);
   useRealtimeReactions(id);
+  useRealtimePolls(id);
 
   const handleReplyToPromptResponse = useCallback((responseId: string, senderName: string, replyInChat: boolean) => {
     setReplyContext({ responseId, senderName, replyInChat });
@@ -99,6 +110,36 @@ export default function GroupChatPage() {
     setGalleryImages(urls);
     setGalleryIndex(startIndex);
   }, []);
+
+  const handleCreatePoll = (data: {
+    title: string;
+    options: { text: string }[];
+    settings: Record<string, unknown>;
+  }) => {
+    if (!id) return;
+    createPoll.mutate({
+      groupId: id,
+      title: data.title,
+      options: data.options,
+      settings: data.settings as Parameters<typeof createPoll.mutate>[0]['settings'],
+    });
+    setIsPollModalOpen(false);
+  };
+
+  const handlePollVote = useCallback((pollId: string, optionIds: string[]) => {
+    if (!id) return;
+    castVote.mutate({ groupId: id, pollId, optionIds });
+  }, [id, castVote]);
+
+  const handlePollClose = useCallback((pollId: string) => {
+    if (!id) return;
+    closePoll.mutate({ groupId: id, pollId });
+  }, [id, closePoll]);
+
+  const handlePollAddOption = useCallback((pollId: string, text: string) => {
+    if (!id) return;
+    addPollOption.mutate({ groupId: id, pollId, text });
+  }, [id, addPollOption]);
 
   const handleLeaveGroup = async () => {
     if (!id) return;
@@ -168,6 +209,9 @@ export default function GroupChatPage() {
         onReplyToMessage={handleReplyToMessage}
         onReactToMessage={handleReactToMessage}
         onImageExpand={handleImageExpand}
+        onPollVote={handlePollVote}
+        onPollClose={handlePollClose}
+        onPollAddOption={handlePollAddOption}
       />
 
       <MessageInput
@@ -175,6 +219,7 @@ export default function GroupChatPage() {
         isLoading={sendMessage.isPending}
         replyContext={replyContext}
         onCancelReply={() => setReplyContext(null)}
+        onCreatePoll={() => setIsPollModalOpen(true)}
       />
 
       {/* Gallery Modal — Full-Screen Image Viewer */}
@@ -261,6 +306,14 @@ export default function GroupChatPage() {
         onClose={() => setIsInviteOpen(false)}
         groupId={group.id}
         groupName={group.name}
+      />
+
+      {/* Create Poll Modal */}
+      <CreatePollModal
+        isOpen={isPollModalOpen}
+        onClose={() => setIsPollModalOpen(false)}
+        onSubmit={handleCreatePoll}
+        isLoading={createPoll.isPending}
       />
 
       {/* Leave Confirmation Modal */}

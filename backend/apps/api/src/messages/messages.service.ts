@@ -1,5 +1,7 @@
 import {
   Injectable,
+  Inject,
+  forwardRef,
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
@@ -8,17 +10,21 @@ import {
   MessageDto,
   MessageListDto,
   MessageSenderDto,
+  PollDto,
   ErrorCode,
   ERROR_MESSAGES,
   SAMPLE_PROMPTS_MAP,
 } from '@app/shared';
 import { ReactionsService } from './reactions.service';
+import { PollsService } from '../polls/polls.service';
 
 @Injectable()
 export class MessagesService {
   constructor(
     private supabaseService: SupabaseService,
     private reactionsService: ReactionsService,
+    @Inject(forwardRef(() => PollsService))
+    private pollsService: PollsService,
   ) {}
 
   /**
@@ -194,6 +200,15 @@ export class MessagesService {
     const messageIds = resultMessages.map((m) => m.id);
     const reactionsMap = await this.reactionsService.batchFetchReactions(messageIds, userId);
 
+    // Batch-fetch poll data for poll-type messages
+    const pollMessageIds = resultMessages
+      .filter((m) => (m as unknown as { type: string }).type === 'poll')
+      .map((m) => m.id);
+    let pollDataMap = new Map<string, PollDto>();
+    if (pollMessageIds.length > 0) {
+      pollDataMap = await this.pollsService.batchFetchPollData(pollMessageIds, userId);
+    }
+
     const messageDtos: MessageDto[] = resultMessages.map((m) => {
       let sender: MessageSenderDto | null = null;
 
@@ -213,7 +228,7 @@ export class MessagesService {
         };
       }
 
-      const messageType = ((m as unknown as { type: string }).type as 'message' | 'system' | 'prompt_response') ?? 'message';
+      const messageType = ((m as unknown as { type: string }).type as 'message' | 'system' | 'prompt_response' | 'poll') ?? 'message';
       const promptResponseId = (m.prompt_response_id as string) ?? null;
 
       // Enrich messages that have a linked prompt response
@@ -263,6 +278,8 @@ export class MessagesService {
 
       const reactions = reactionsMap.get(m.id) ?? null;
 
+      const pollData = pollDataMap.get(m.id) ?? null;
+
       return {
         id: m.id,
         groupId: m.group_id,
@@ -277,6 +294,7 @@ export class MessagesService {
         replyToId,
         replyToPreview,
         reactions,
+        pollData,
       };
     });
 

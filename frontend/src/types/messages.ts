@@ -32,13 +32,44 @@ export interface ToggleReactionResponse {
   reactions: Reaction[];
 }
 
+export interface PollVoter {
+  userId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+}
+
+export interface PollOption {
+  id: string;
+  text: string;
+  position: number;
+  voteCount: number;
+  voters: PollVoter[] | null;
+  hasVoted: boolean;
+}
+
+export interface PollData {
+  id: string;
+  title: string;
+  options: PollOption[];
+  allowMultiple: boolean;
+  showVotes: boolean;
+  allowAddOptions: boolean;
+  declareWinnerOnAllVoted: boolean;
+  closesAt: string | null;
+  closed: boolean;
+  closedReason: string | null;
+  winningOptionId: string | null;
+  creatorId: string;
+  totalVoters: number;
+}
+
 export interface Message {
   id: string;
   groupId: string;
   sender: MessageSender | null;
   content: string;
   createdAt: string;
-  type: 'message' | 'system' | 'prompt_response';
+  type: 'message' | 'system' | 'prompt_response' | 'poll';
   promptResponseId?: string | null;
   promptData?: PromptData | null;
   replyCount?: number | null;
@@ -46,6 +77,7 @@ export interface Message {
   replyToId?: string | null;
   replyToPreview?: ReplyToPreview | null;
   reactions?: Reaction[] | null;
+  pollData?: PollData | null;
   // For optimistic updates
   pending?: boolean;
   error?: boolean;

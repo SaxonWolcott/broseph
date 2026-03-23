@@ -6,6 +6,7 @@ import { MessageBubble } from './MessageBubble';
 import { SystemMessage } from './SystemMessage';
 import { PromptResponseCard } from './PromptResponseCard';
 import { PromptResponseModal } from './PromptResponseModal';
+import { PollCard } from './PollCard';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface MessageListProps {
@@ -18,6 +19,9 @@ interface MessageListProps {
   onReplyToMessage?: (message: Message) => void;
   onReactToMessage?: (messageId: string, emoji: string) => void;
   onImageExpand?: (urls: string[], startIndex: number) => void;
+  onPollVote?: (pollId: string, optionIds: string[]) => void;
+  onPollClose?: (pollId: string) => void;
+  onPollAddOption?: (pollId: string, text: string) => void;
 }
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -214,6 +218,9 @@ export function MessageList({
   onReplyToMessage,
   onReactToMessage,
   onImageExpand,
+  onPollVote,
+  onPollClose,
+  onPollAddOption,
 }: MessageListProps) {
   const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -318,6 +325,25 @@ export function MessageList({
                   onReplyInChat={() => handleAction(message, true)}
                   onTap={() => setSelectedResponse(message)}
                 />
+              </div>
+            );
+          }
+
+          // Poll message
+          if (message.type === 'poll' && message.pollData) {
+            const isOwn = message.sender?.id === user?.id;
+            return (
+              <div key={message.id} id={`msg-${message.id}`} className="transition-colors duration-500">
+                {conversationMarker}
+                <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                  <PollCard
+                    pollData={message.pollData}
+                    isCreator={message.sender?.id === user?.id}
+                    onVote={(pollId, optionIds) => onPollVote?.(pollId, optionIds)}
+                    onClose={(pollId) => onPollClose?.(pollId)}
+                    onAddOption={(pollId, text) => onPollAddOption?.(pollId, text)}
+                  />
+                </div>
               </div>
             );
           }
