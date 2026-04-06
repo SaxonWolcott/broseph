@@ -145,8 +145,8 @@ export class MessageDto {
   @ApiProperty()
   createdAt!: string;
 
-  @ApiPropertyOptional({ default: 'message', enum: ['message', 'system', 'prompt_response', 'poll'] })
-  type!: 'message' | 'system' | 'prompt_response' | 'poll';
+  @ApiPropertyOptional({ default: 'message', enum: ['message', 'system', 'prompt_response', 'poll', 'payment'] })
+  type!: 'message' | 'system' | 'prompt_response' | 'poll' | 'payment';
 
   @ApiPropertyOptional({ format: 'uuid', description: 'Linked prompt response ID' })
   promptResponseId!: string | null;
@@ -203,6 +203,34 @@ export class MessageDto {
     winningOptionId: string | null;
     creatorId: string;
     totalVoters: number;
+  } | null;
+
+  @ApiPropertyOptional({ description: 'Payment data (for payment type messages)' })
+  paymentData!: {
+    id: string;
+    title: string;
+    mode: 'per_item' | 'per_person' | 'direct';
+    recipientId: string | null;
+    recipientName: string | null;
+    totalAmountCents: number;
+    currency: string;
+    status: 'active' | 'completed' | 'cancelled';
+    items: {
+      id: string;
+      description: string;
+      amountCents: number;
+      position: number;
+      status: 'unpaid' | 'processing' | 'paid' | 'failed';
+      assignedUserId: string | null;
+      assignedUserName: string | null;
+      assignedUserAvatarUrl: string | null;
+      paidBy: string | null;
+      paidByName: string | null;
+      paidByAvatarUrl: string | null;
+      paidAt: string | null;
+    }[];
+    creatorId: string;
+    createdAt: string;
   } | null;
 }
 

@@ -10,6 +10,7 @@ import { MembersModule } from './members/members.module';
 import { InvitesModule } from './invites/invites.module';
 import { PromptsModule } from './prompts/prompts.module';
 import { PollsModule } from './polls/polls.module';
+import { PaymentsModule } from './payments/payments.module';
 import { EmailModule } from './email/email.module';
 
 @Module({
@@ -36,6 +37,7 @@ import { EmailModule } from './email/email.module';
     InvitesModule,
     PromptsModule,
     PollsModule,
+    PaymentsModule,
   ],
   controllers: [HealthController],
   providers: [],

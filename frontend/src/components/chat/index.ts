@@ -10,3 +10,6 @@ export * from './QuickReactionMenu';
 export * from './EmojiPickerPopover';
 export * from './PollCard';
 export * from './CreatePollModal';
+export * from './PaymentCard';
+export * from './CreatePaymentModal';
+export * from './ActivePaymentsBanner';

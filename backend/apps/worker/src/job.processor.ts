@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { GroupsHandler, MessagesHandler, MembersHandler, PollsHandler } from './handlers';
+import { GroupsHandler, MessagesHandler, MembersHandler, PollsHandler, PaymentsHandler } from './handlers';
 
 @Processor('broseph-jobs')
 export class JobProcessor extends WorkerHost {
@@ -12,6 +12,7 @@ export class JobProcessor extends WorkerHost {
     private messagesHandler: MessagesHandler,
     private membersHandler: MembersHandler,
     private pollsHandler: PollsHandler,
+    private paymentsHandler: PaymentsHandler,
   ) {
     super();
   }
@@ -50,6 +51,14 @@ export class JobProcessor extends WorkerHost {
           break;
         case 'close-poll':
           result = await this.pollsHandler.handleClosePoll(job);
+          break;
+
+        // Payment operations
+        case 'create-payment-request':
+          result = await this.paymentsHandler.handleCreatePaymentRequest(job);
+          break;
+        case 'process-stripe-webhook':
+          result = await this.paymentsHandler.handleStripeWebhook(job);
           break;
 
         default:

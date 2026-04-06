@@ -10,6 +10,12 @@ import { useRealtimeMessages } from '../hooks/useRealtimeMessages';
 import { useRealtimeMembers } from '../hooks/useRealtimeMembers';
 import { useRealtimeReactions } from '../hooks/useRealtimeReactions';
 import { useRealtimePolls } from '../hooks/useRealtimePolls';
+import { useRealtimePayments } from '../hooks/useRealtimePayments';
+import { useCreatePayment } from '../hooks/useCreatePayment';
+import { usePaymentCheckout } from '../hooks/usePaymentCheckout';
+import { useCancelPayment } from '../hooks/useCancelPayment';
+import { usePaymentCounts } from '../hooks/usePaymentCounts';
+import { useGroupMembers } from '../hooks/useGroupMembers';
 import { useToggleReaction } from '../hooks/useToggleReaction';
 import { useCreatePoll } from '../hooks/useCreatePoll';
 import { useCastVote } from '../hooks/useCastVote';
@@ -19,6 +25,8 @@ import { useGroupPrompt } from '../hooks/useGroupPrompt';
 import { useSubmitPromptResponse } from '../hooks/useSubmitPromptResponse';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { ChatHeader, MessageList, MessageInput, PromptBanner, CreatePollModal } from '../components/chat';
+import { CreatePaymentModal } from '../components/chat/CreatePaymentModal';
+import { ActivePaymentsBanner } from '../components/chat/ActivePaymentsBanner';
 import type { ReplyContext } from '../components/chat/MessageInput';
 import { MemberList } from '../components/members';
 import { InviteModal } from '../components/invites';
@@ -35,6 +43,7 @@ export default function GroupChatPage() {
   const [galleryImages, setGalleryImages] = useState<string[] | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [isPollModalOpen, setIsPollModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   const { data: group, isLoading: isGroupLoading, error: groupError } = useGroup(id);
   const {
@@ -55,12 +64,18 @@ export default function GroupChatPage() {
   const castVote = useCastVote();
   const closePoll = useClosePoll();
   const addPollOption = useAddPollOption();
+  const createPayment = useCreatePayment();
+  const paymentCheckout = usePaymentCheckout();
+  const cancelPayment = useCancelPayment();
+  const { data: paymentCounts } = usePaymentCounts(id);
+  const { data: groupMembers } = useGroupMembers(id);
 
   // Real-time subscriptions for instant updates
   useRealtimeMessages(id);
   useRealtimeMembers(id);
   useRealtimeReactions(id);
   useRealtimePolls(id);
+  useRealtimePayments(id);
 
   const handleReplyToPromptResponse = useCallback((responseId: string, senderName: string, replyInChat: boolean) => {
     setReplyContext({ responseId, senderName, replyInChat });
@@ -141,6 +156,27 @@ export default function GroupChatPage() {
     addPollOption.mutate({ groupId: id, pollId, text });
   }, [id, addPollOption]);
 
+  const handleCreatePayment = (data: {
+    title: string;
+    mode: 'per_item' | 'per_person' | 'direct';
+    recipientId?: string;
+    items: { description: string; amountCents: number; assignedUserId?: string }[];
+  }) => {
+    if (!id) return;
+    createPayment.mutate({ groupId: id, ...data });
+    setIsPaymentModalOpen(false);
+  };
+
+  const handlePaymentPay = useCallback((paymentId: string, itemId: string) => {
+    if (!id) return;
+    paymentCheckout.mutate({ groupId: id, paymentId, itemId });
+  }, [id, paymentCheckout]);
+
+  const handlePaymentCancel = useCallback((paymentId: string) => {
+    if (!id) return;
+    cancelPayment.mutate({ groupId: id, paymentId });
+  }, [id, cancelPayment]);
+
   const handleLeaveGroup = async () => {
     if (!id) return;
     try {
@@ -199,6 +235,16 @@ export default function GroupChatPage() {
         />
       )}
 
+      <ActivePaymentsBanner
+        groupId={id || ''}
+        currentUserId={user?.id || ''}
+        activeCount={paymentCounts?.activeCount || 0}
+        attentionCount={paymentCounts?.attentionCount || 0}
+        onPay={handlePaymentPay}
+        onCancel={handlePaymentCancel}
+        isCheckoutLoading={paymentCheckout.isPending}
+      />
+
       <MessageList
         data={messagesData}
         isLoading={isMessagesLoading}
@@ -212,6 +258,9 @@ export default function GroupChatPage() {
         onPollVote={handlePollVote}
         onPollClose={handlePollClose}
         onPollAddOption={handlePollAddOption}
+        onPaymentPay={handlePaymentPay}
+        onPaymentCancel={handlePaymentCancel}
+        isCheckoutLoading={paymentCheckout.isPending}
       />
 
       <MessageInput
@@ -220,6 +269,7 @@ export default function GroupChatPage() {
         replyContext={replyContext}
         onCancelReply={() => setReplyContext(null)}
         onCreatePoll={() => setIsPollModalOpen(true)}
+        onCreatePayment={() => setIsPaymentModalOpen(true)}
       />
 
       {/* Gallery Modal — Full-Screen Image Viewer */}
@@ -314,6 +364,19 @@ export default function GroupChatPage() {
         onClose={() => setIsPollModalOpen(false)}
         onSubmit={handleCreatePoll}
         isLoading={createPoll.isPending}
+      />
+
+      {/* Create Payment Modal */}
+      <CreatePaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        onSubmit={handleCreatePayment}
+        isLoading={createPayment.isPending}
+        members={groupMembers || group.members.map((m) => ({
+          ...m,
+          userId: m.userId || m.id,
+        }))}
+        currentUserId={user?.id || ''}
       />
 
       {/* Leave Confirmation Modal */}

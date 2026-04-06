@@ -11,6 +11,7 @@ export * from './dto/auth.dto';
 export * from './dto/groups.dto';
 export * from './dto/messages.dto';
 export * from './dto/polls.dto';
+export * from './dto/payments.dto';
 export * from './dto/invites.dto';
 export * from './dto/prompts.dto';
 export * from './dto/jobs';

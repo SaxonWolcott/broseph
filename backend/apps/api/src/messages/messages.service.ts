@@ -11,12 +11,14 @@ import {
   MessageListDto,
   MessageSenderDto,
   PollDto,
+  PaymentRequestDto,
   ErrorCode,
   ERROR_MESSAGES,
   SAMPLE_PROMPTS_MAP,
 } from '@app/shared';
 import { ReactionsService } from './reactions.service';
 import { PollsService } from '../polls/polls.service';
+import { PaymentsService } from '../payments/payments.service';
 
 @Injectable()
 export class MessagesService {
@@ -25,6 +27,8 @@ export class MessagesService {
     private reactionsService: ReactionsService,
     @Inject(forwardRef(() => PollsService))
     private pollsService: PollsService,
+    @Inject(forwardRef(() => PaymentsService))
+    private paymentsService: PaymentsService,
   ) {}
 
   /**
@@ -209,6 +213,15 @@ export class MessagesService {
       pollDataMap = await this.pollsService.batchFetchPollData(pollMessageIds, userId);
     }
 
+    // Batch-fetch payment data for payment-type messages
+    const paymentMessageIds = resultMessages
+      .filter((m) => (m as unknown as { type: string }).type === 'payment')
+      .map((m) => m.id);
+    let paymentDataMap = new Map<string, PaymentRequestDto>();
+    if (paymentMessageIds.length > 0) {
+      paymentDataMap = await this.paymentsService.batchFetchPaymentData(paymentMessageIds);
+    }
+
     const messageDtos: MessageDto[] = resultMessages.map((m) => {
       let sender: MessageSenderDto | null = null;
 
@@ -228,7 +241,7 @@ export class MessagesService {
         };
       }
 
-      const messageType = ((m as unknown as { type: string }).type as 'message' | 'system' | 'prompt_response' | 'poll') ?? 'message';
+      const messageType = ((m as unknown as { type: string }).type as 'message' | 'system' | 'prompt_response' | 'poll' | 'payment') ?? 'message';
       const promptResponseId = (m.prompt_response_id as string) ?? null;
 
       // Enrich messages that have a linked prompt response
@@ -279,6 +292,7 @@ export class MessagesService {
       const reactions = reactionsMap.get(m.id) ?? null;
 
       const pollData = pollDataMap.get(m.id) ?? null;
+      const paymentData = paymentDataMap.get(m.id) ?? null;
 
       return {
         id: m.id,
@@ -295,6 +309,7 @@ export class MessagesService {
         replyToPreview,
         reactions,
         pollData,
+        paymentData,
       };
     });
 

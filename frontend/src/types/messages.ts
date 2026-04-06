@@ -1,3 +1,5 @@
+import { PaymentData } from './payments';
+
 export interface MessageSender {
   id: string;
   displayName: string | null;
@@ -69,7 +71,7 @@ export interface Message {
   sender: MessageSender | null;
   content: string;
   createdAt: string;
-  type: 'message' | 'system' | 'prompt_response' | 'poll';
+  type: 'message' | 'system' | 'prompt_response' | 'poll' | 'payment';
   promptResponseId?: string | null;
   promptData?: PromptData | null;
   replyCount?: number | null;
@@ -78,6 +80,7 @@ export interface Message {
   replyToPreview?: ReplyToPreview | null;
   reactions?: Reaction[] | null;
   pollData?: PollData | null;
+  paymentData?: PaymentData | null;
   // For optimistic updates
   pending?: boolean;
   error?: boolean;

@@ -7,6 +7,7 @@ import { SystemMessage } from './SystemMessage';
 import { PromptResponseCard } from './PromptResponseCard';
 import { PromptResponseModal } from './PromptResponseModal';
 import { PollCard } from './PollCard';
+import { PaymentCard } from './PaymentCard';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface MessageListProps {
@@ -22,6 +23,9 @@ interface MessageListProps {
   onPollVote?: (pollId: string, optionIds: string[]) => void;
   onPollClose?: (pollId: string) => void;
   onPollAddOption?: (pollId: string, text: string) => void;
+  onPaymentPay?: (paymentId: string, itemId: string) => void;
+  onPaymentCancel?: (paymentId: string) => void;
+  isCheckoutLoading?: boolean;
 }
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -221,6 +225,9 @@ export function MessageList({
   onPollVote,
   onPollClose,
   onPollAddOption,
+  onPaymentPay,
+  onPaymentCancel,
+  isCheckoutLoading,
 }: MessageListProps) {
   const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -342,6 +349,26 @@ export function MessageList({
                     onVote={(pollId, optionIds) => onPollVote?.(pollId, optionIds)}
                     onClose={(pollId) => onPollClose?.(pollId)}
                     onAddOption={(pollId, text) => onPollAddOption?.(pollId, text)}
+                  />
+                </div>
+              </div>
+            );
+          }
+
+          // Payment message
+          if (message.type === 'payment' && message.paymentData) {
+            const isOwn = message.sender?.id === user?.id;
+            return (
+              <div key={message.id} id={`msg-${message.id}`} className="transition-colors duration-500">
+                {conversationMarker}
+                <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                  <PaymentCard
+                    paymentData={message.paymentData}
+                    isCreator={message.sender?.id === user?.id}
+                    currentUserId={user?.id || ''}
+                    onPay={(paymentId, itemId) => onPaymentPay?.(paymentId, itemId)}
+                    onCancel={(paymentId) => onPaymentCancel?.(paymentId)}
+                    isCheckoutLoading={isCheckoutLoading}
                   />
                 </div>
               </div>
