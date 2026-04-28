@@ -171,6 +171,12 @@ export function PaymentCard({
             </p>
           )}
 
+          {paymentData.note && (
+            <p className="text-xs italic text-default-500 mt-1 whitespace-pre-wrap break-words">
+              {paymentData.note}
+            </p>
+          )}
+
           {/* Progress bar */}
           <div className="mt-2">
             <div className="flex justify-between text-[10px] text-default-400 mb-1">

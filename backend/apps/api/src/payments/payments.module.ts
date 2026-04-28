@@ -4,6 +4,7 @@ import { PaymentsController } from './payments.controller';
 import { StripeWebhookController } from './stripe-webhook.controller';
 import { PaymentsService } from './payments.service';
 import { StripeService } from './stripe.service';
+import { ReceiptExtractionService } from './receipt-extraction.service';
 import { MessagesModule } from '../messages/messages.module';
 
 @Module({
@@ -12,7 +13,7 @@ import { MessagesModule } from '../messages/messages.module';
     forwardRef(() => MessagesModule),
   ],
   controllers: [PaymentsController, StripeWebhookController],
-  providers: [PaymentsService, StripeService],
+  providers: [PaymentsService, StripeService, ReceiptExtractionService],
   exports: [PaymentsService],
 })
 export class PaymentsModule {}

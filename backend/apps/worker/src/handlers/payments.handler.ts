@@ -16,7 +16,8 @@ export class PaymentsHandler {
   async handleCreatePaymentRequest(
     job: Job<CreatePaymentRequestJobDto>,
   ): Promise<CreatePaymentRequestJobResult> {
-    const { groupId, creatorId, title, mode, recipientId, items } = job.data;
+    const { groupId, creatorId, title, note, extractedReceipt, mode, recipientId, items } =
+      job.data;
     this.logger.log(`Creating payment request "${title}" in group ${groupId}`);
 
     const adminClient = this.supabaseService.getAdminClient();
@@ -60,6 +61,8 @@ export class PaymentsHandler {
         group_id: groupId,
         creator_id: creatorId,
         title,
+        note: note ?? null,
+        extracted_receipt: extractedReceipt ?? null,
         mode,
         recipient_id: recipientId ?? null,
         total_amount_cents: totalAmountCents,

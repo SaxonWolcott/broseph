@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Modal,
   ModalContent,
@@ -10,8 +10,11 @@ import {
   Switch,
   Avatar,
   Chip,
+  Spinner,
 } from '@heroui/react';
 import { GroupMember } from '../../types/groups';
+import { ExtractedReceipt } from '../../types/payments';
+import { useExtractReceipt } from '../../hooks/useExtractReceipt';
 
 type PaymentMode = 'request' | 'pay';
 type RequestMode = 'per_item' | 'per_person';
@@ -31,13 +34,58 @@ interface CreatePaymentModalProps {
   onClose: () => void;
   onSubmit: (data: {
     title: string;
+    note?: string;
+    extractedReceipt?: ExtractedReceipt;
     mode: 'per_item' | 'per_person' | 'direct';
     recipientId?: string;
     items: { description: string; amountCents: number; assignedUserId?: string }[];
   }) => void;
   isLoading?: boolean;
+  groupId: string;
   members: GroupMember[];
   currentUserId: string;
+}
+
+const AUTO_DISTRIBUTE_NOTE = 'Tax and tip distributed across items';
+
+function buildItemsFromReceipt(
+  receipt: ExtractedReceipt,
+  distributed: boolean,
+): PaymentItem[] {
+  const food = receipt.items;
+  const tax = receipt.taxCents ?? 0;
+  const tip = receipt.tipCents ?? 0;
+  const extras = tax + tip;
+
+  if (!distributed || extras === 0 || food.length === 0) {
+    const items: PaymentItem[] = food.map((i) => ({
+      description: i.description,
+      amountCents: i.amountCents,
+    }));
+    if (tax > 0) items.push({ description: 'Tax', amountCents: tax });
+    if (tip > 0) items.push({ description: 'Tip', amountCents: tip });
+    return items;
+  }
+
+  const foodTotal = food.reduce((sum, i) => sum + i.amountCents, 0);
+  if (foodTotal === 0) {
+    return food.map((i) => ({ description: i.description, amountCents: i.amountCents }));
+  }
+
+  const totalCents = foodTotal + extras;
+  let remaining = totalCents;
+  return food.map((i, idx) => {
+    if (idx === food.length - 1) {
+      return { description: i.description, amountCents: remaining };
+    }
+    const share = Math.round((i.amountCents / foodTotal) * totalCents);
+    remaining -= share;
+    return { description: i.description, amountCents: share };
+  });
+}
+
+function itemsToAmountInputs(items: PaymentItem[]): string[] {
+  return items.map((i) => (i.amountCents > 0 ? (i.amountCents / 100).toFixed(2) : ''));
 }
 
 function formatCents(cents: number): string {
@@ -55,11 +103,13 @@ export function CreatePaymentModal({
   onClose,
   onSubmit,
   isLoading,
+  groupId,
   members,
   currentUserId,
 }: CreatePaymentModalProps) {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('request');
   const [title, setTitle] = useState('');
+  const [note, setNote] = useState('');
 
   // Request mode state
   const [requestMode, setRequestMode] = useState<RequestMode>('per_item');
@@ -77,11 +127,19 @@ export function CreatePaymentModal({
   const [payAmount, setPayAmount] = useState('');
   const [payDescription, setPayDescription] = useState('');
 
+  // Receipt extraction state
+  const [extractedReceipt, setExtractedReceipt] = useState<ExtractedReceipt | null>(null);
+  const [isDistributed, setIsDistributed] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
+  const extractReceipt = useExtractReceipt();
+
   const otherMembers = members.filter((m) => m.userId !== currentUserId);
 
   const resetForm = () => {
     setPaymentMode('request');
     setTitle('');
+    setNote('');
     setRequestMode('per_item');
     setItems([{ description: '', amountCents: 0 }]);
     setItemAmountInputs(['']);
@@ -92,6 +150,97 @@ export function CreatePaymentModal({
     setSelectedRecipient(null);
     setPayAmount('');
     setPayDescription('');
+    setExtractedReceipt(null);
+    setIsDistributed(false);
+    setExtractError(null);
+    extractReceipt.reset();
+  };
+
+  const handleScanClick = () => {
+    receiptInputRef.current?.click();
+  };
+
+  const handleReceiptSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = '';
+    if (!file) return;
+
+    setExtractError(null);
+    try {
+      const receipt = await extractReceipt.mutateAsync({ groupId, file });
+      if (receipt.parseStatus === 'not_a_receipt') {
+        setExtractError("That doesn't look like a receipt. Try a clearer photo.");
+        return;
+      }
+      if (receipt.parseStatus === 'illegible' && receipt.items.length === 0) {
+        setExtractError('Could not read the receipt. Try a clearer photo.');
+        return;
+      }
+
+      setPaymentMode('request');
+      setRequestMode('per_item');
+      setExtractedReceipt(receipt);
+      setIsDistributed(false);
+      setTitle(receipt.title);
+
+      const newItems = buildItemsFromReceipt(receipt, false);
+      const itemsForState = newItems.length > 0 ? newItems : [{ description: '', amountCents: 0 }];
+      setItems(itemsForState);
+      setItemAmountInputs(itemsToAmountInputs(itemsForState));
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : 'Failed to extract receipt');
+    }
+  };
+
+  const handleToggleDistribute = () => {
+    if (!extractedReceipt) return;
+    const next = !isDistributed;
+    const newItems = buildItemsFromReceipt(extractedReceipt, next);
+    setItems(newItems);
+    setItemAmountInputs(itemsToAmountInputs(newItems));
+    setIsDistributed(next);
+
+    if (next) {
+      if (!note.trim()) setNote(AUTO_DISTRIBUTE_NOTE);
+    } else {
+      if (note === AUTO_DISTRIBUTE_NOTE) setNote('');
+    }
+  };
+
+  const hasTaxOrTip =
+    !!extractedReceipt &&
+    ((extractedReceipt.taxCents ?? 0) > 0 || (extractedReceipt.tipCents ?? 0) > 0) &&
+    extractedReceipt.items.length > 0;
+
+  const handleCollapseToTotal = () => {
+    if (!extractedReceipt) return;
+    const description =
+      extractedReceipt.merchantName || extractedReceipt.title || 'Receipt';
+    const newItems = [
+      { description, amountCents: extractedReceipt.totalAmountCents },
+    ];
+    setItems(newItems);
+    setItemAmountInputs(itemsToAmountInputs(newItems));
+    setIsDistributed(false);
+    if (note === AUTO_DISTRIBUTE_NOTE) setNote('');
+  };
+
+  const handleSwitchToSplitEven = () => {
+    if (!extractedReceipt || otherMembers.length === 0) return;
+    setRequestMode('per_person');
+    setSplitEvenly(true);
+
+    const totalCents = extractedReceipt.totalAmountCents;
+    setEvenAmount((totalCents / 100).toFixed(2));
+
+    const perPerson = Math.ceil(totalCents / otherMembers.length);
+    const newSplits = otherMembers.map((m) => ({
+      userId: m.userId,
+      amountCents: perPerson,
+    }));
+    setSplits(newSplits);
+    const perPersonStr = (perPerson / 100).toFixed(2);
+    setSplitAmountInputs(new Array(newSplits.length).fill(perPersonStr));
   };
 
   const handleClose = () => {
@@ -113,6 +262,9 @@ export function CreatePaymentModal({
   const handleSubmit = () => {
     if (!title.trim()) return;
 
+    const trimmedNote = note.trim();
+    const noteField = trimmedNote ? { note: trimmedNote } : {};
+
     if (paymentMode === 'pay') {
       if (!selectedRecipient || !payAmount) return;
       const cents = parseDollarsToCents(payAmount);
@@ -120,6 +272,7 @@ export function CreatePaymentModal({
 
       onSubmit({
         title: title.trim(),
+        ...noteField,
         mode: 'direct',
         recipientId: selectedRecipient,
         items: [
@@ -138,6 +291,8 @@ export function CreatePaymentModal({
 
       onSubmit({
         title: title.trim(),
+        ...noteField,
+        ...(extractedReceipt ? { extractedReceipt } : {}),
         mode: 'per_item',
         items: validItems.map((item) => ({
           description: item.description.trim(),
@@ -151,6 +306,7 @@ export function CreatePaymentModal({
 
       onSubmit({
         title: title.trim(),
+        ...noteField,
         mode: 'per_person',
         items: validSplits.map((s) => {
           const member = otherMembers.find((m) => m.userId === s.userId);
@@ -281,6 +437,67 @@ export function CreatePaymentModal({
             classNames={{ inputWrapper: 'bg-default-200' }}
           />
 
+          {/* Note */}
+          <Input
+            label="Note (optional)"
+            placeholder="e.g., Tax and tip distributed across items"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={500}
+            classNames={{ inputWrapper: 'bg-default-200' }}
+          />
+
+          {/* Hidden receipt file input */}
+          <input
+            ref={receiptInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+            capture="environment"
+            className="hidden"
+            onChange={handleReceiptSelect}
+          />
+
+          {/* Scan Receipt button (request mode only) */}
+          {paymentMode === 'request' && (
+            <Button
+              variant="flat"
+              color="primary"
+              size="sm"
+              onPress={handleScanClick}
+              isDisabled={extractReceipt.isPending}
+              startContent={
+                extractReceipt.isPending ? (
+                  <Spinner size="sm" color="primary" />
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="w-4 h-4"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316ZM16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z"
+                    />
+                  </svg>
+                )
+              }
+            >
+              {extractReceipt.isPending
+                ? 'Reading receipt...'
+                : extractedReceipt
+                  ? 'Re-scan receipt'
+                  : 'Scan receipt'}
+            </Button>
+          )}
+
+          {extractError && (
+            <p className="text-xs text-danger">{extractError}</p>
+          )}
+
           {paymentMode === 'pay' ? (
             /* ── Pay Mode ── */
             <div className="space-y-3">
@@ -363,6 +580,42 @@ export function CreatePaymentModal({
               {requestMode === 'per_item' ? (
                 /* Per-item list */
                 <div className="space-y-2">
+                  {extractedReceipt &&
+                    extractedReceipt.totalAmountCents > 0 &&
+                    items.reduce((s, i) => s + i.amountCents, 0) <
+                      extractedReceipt.totalAmountCents * 0.5 && (
+                      <div className="rounded-lg border border-warning-200 bg-warning-50/40 p-3 space-y-2">
+                        <p className="text-xs text-warning-700">
+                          Items couldn't be priced individually, but the receipt total is{' '}
+                          <span className="font-semibold">
+                            {formatCents(extractedReceipt.totalAmountCents)}
+                          </span>
+                          .
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            color="warning"
+                            onPress={handleCollapseToTotal}
+                            className="flex-1"
+                          >
+                            Use total as one item
+                          </Button>
+                          {otherMembers.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              color="warning"
+                              onPress={handleSwitchToSplitEven}
+                              className="flex-1"
+                            >
+                              Split evenly across members
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   {items.map((item, i) => (
                     <div key={i} className="flex gap-2 items-start">
                       <Input
@@ -402,6 +655,19 @@ export function CreatePaymentModal({
                   {items.length < 20 && (
                     <Button size="sm" variant="flat" onPress={addItem} className="w-full">
                       + Add item
+                    </Button>
+                  )}
+                  {hasTaxOrTip && (
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      color="secondary"
+                      onPress={handleToggleDistribute}
+                      className="w-full"
+                    >
+                      {isDistributed
+                        ? 'Keep tax & tip as separate items'
+                        : 'Distribute tax & tip across items'}
                     </Button>
                   )}
                 </div>

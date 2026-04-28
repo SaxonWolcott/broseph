@@ -158,6 +158,8 @@ export default function GroupChatPage() {
 
   const handleCreatePayment = (data: {
     title: string;
+    note?: string;
+    extractedReceipt?: import('../types/payments').ExtractedReceipt;
     mode: 'per_item' | 'per_person' | 'direct';
     recipientId?: string;
     items: { description: string; amountCents: number; assignedUserId?: string }[];
@@ -372,6 +374,7 @@ export default function GroupChatPage() {
         onClose={() => setIsPaymentModalOpen(false)}
         onSubmit={handleCreatePayment}
         isLoading={createPayment.isPending}
+        groupId={id || ''}
         members={groupMembers || group.members.map((m) => ({
           ...m,
           userId: m.userId || m.id,

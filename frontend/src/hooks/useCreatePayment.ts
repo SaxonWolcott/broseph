@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { messagesQueryKey } from './useMessages';
+import type { ExtractedReceipt } from '../types/payments';
 
 interface CreatePaymentItemInput {
   description: string;
@@ -11,6 +12,8 @@ interface CreatePaymentItemInput {
 interface CreatePaymentParams {
   groupId: string;
   title: string;
+  note?: string;
+  extractedReceipt?: ExtractedReceipt;
   mode: 'per_item' | 'per_person' | 'direct';
   recipientId?: string;
   items: CreatePaymentItemInput[];

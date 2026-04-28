@@ -11,8 +11,32 @@ import {
   Min,
   Max,
   IsIn,
+  IsObject,
 } from 'class-validator';
 import { LIMITS } from '../constants/limits';
+
+// ── Receipt extraction ──
+
+export interface ExtractedReceiptItem {
+  description: string;
+  amountCents: number;
+}
+
+export interface ExtractedReceipt {
+  parseStatus: 'ok' | 'not_a_receipt' | 'illegible';
+  title: string;
+  merchantName?: string;
+  purchaseDate?: string;
+  currency: string;
+  subtotalCents?: number;
+  taxCents?: number;
+  tipCents?: number;
+  totalAmountCents: number;
+  items: ExtractedReceiptItem[];
+  // Backend-added audit fields:
+  model: string;
+  extractedAt: string;
+}
 
 // ── Request DTOs ──
 
@@ -49,6 +73,17 @@ export class CreatePaymentRequestDto {
   @IsOptional()
   @IsUUID('4')
   recipientId?: string;
+
+  @ApiPropertyOptional({ description: 'Optional free-text note shown on the payment card' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(LIMITS.MAX_PAYMENT_NOTE_LENGTH)
+  note?: string;
+
+  @ApiPropertyOptional({ description: 'Audit JSON when payment was created from a scanned receipt' })
+  @IsOptional()
+  @IsObject()
+  extractedReceipt?: ExtractedReceipt;
 
   @ApiProperty({ type: [CreatePaymentItemInput], minItems: 1 })
   @IsArray()
@@ -110,6 +145,9 @@ export class PaymentRequestDto {
   @ApiProperty()
   title!: string;
 
+  @ApiPropertyOptional()
+  note!: string | null;
+
   @ApiProperty({ enum: ['per_item', 'per_person', 'direct'] })
   mode!: 'per_item' | 'per_person' | 'direct';
 
@@ -136,6 +174,9 @@ export class PaymentRequestDto {
 
   @ApiProperty()
   createdAt!: string;
+
+  @ApiPropertyOptional()
+  extractedReceipt!: ExtractedReceipt | null;
 }
 
 export class CheckoutSessionResponseDto {

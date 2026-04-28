@@ -8,31 +8,42 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
+  UseInterceptors,
+  UploadedFile,
+  Req,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiConsumes,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { User } from '@supabase/supabase-js';
+import { Request } from 'express';
 import {
   CreatePaymentRequestDto,
   InitiateCheckoutDto,
   PaymentRequestDto,
   CheckoutSessionResponseDto,
   CreatePaymentRequestJobDto,
+  ExtractedReceipt,
   generateId,
 } from '@app/shared';
 import { PaymentsService } from './payments.service';
+import { ReceiptExtractionService } from './receipt-extraction.service';
 import { MessagesService } from '../messages/messages.service';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import {
   CurrentUser,
   AccessToken,
 } from '../auth/decorators/current-user.decorator';
+
+const MAX_RECEIPT_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB
 
 class JobAcceptedDto {
   jobId!: string;
@@ -46,6 +57,7 @@ class JobAcceptedDto {
 export class PaymentsController {
   constructor(
     private paymentsService: PaymentsService,
+    private receiptExtractionService: ReceiptExtractionService,
     private messagesService: MessagesService,
     @InjectQueue('broseph-jobs') private jobQueue: Queue,
   ) {}
@@ -67,6 +79,8 @@ export class PaymentsController {
       groupId,
       creatorId: user.id,
       title: dto.title,
+      note: dto.note,
+      extractedReceipt: dto.extractedReceipt,
       mode: dto.mode,
       recipientId: dto.recipientId,
       items: dto.items.map((item) => ({
@@ -144,5 +158,39 @@ export class PaymentsController {
   ): Promise<PaymentRequestDto> {
     await this.messagesService.validateMembership(groupId, user.id, token);
     return this.paymentsService.cancelPaymentRequest(paymentId, user.id);
+  }
+
+  @Post('extract-from-receipt')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Extract structured payment data from a receipt image' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Extracted receipt data' })
+  @UseInterceptors(
+    FileInterceptor('image', { limits: { fileSize: MAX_RECEIPT_IMAGE_BYTES } }),
+  )
+  async extractFromReceipt(
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @Req() req: Request,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<ExtractedReceipt> {
+    if (!file) {
+      throw new BadRequestException('No image uploaded. Send a multipart form with field "image".');
+    }
+    await this.messagesService.validateMembership(groupId, user.id, token);
+
+    const abortController = new AbortController();
+    req.on('close', () => {
+      if (!req.complete) {
+        abortController.abort();
+      }
+    });
+
+    return this.receiptExtractionService.extractFromImage(
+      file.buffer,
+      file.mimetype,
+      abortController.signal,
+    );
   }
 }

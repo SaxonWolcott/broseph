@@ -10,6 +10,7 @@ import {
   PaymentRequestDto,
   PaymentItemDto,
   CheckoutSessionResponseDto,
+  ExtractedReceipt,
 } from '@app/shared';
 import { StripeService } from './stripe.service';
 
@@ -390,6 +391,7 @@ export class PaymentsService {
     return {
       id: request.id as string,
       title: request.title as string,
+      note: (request.note as string) ?? null,
       mode: request.mode as PaymentRequestDto['mode'],
       recipientId: (request.recipient_id as string) ?? null,
       recipientName: recipientProfile?.display_name ?? null,
@@ -399,6 +401,7 @@ export class PaymentsService {
       items: itemDtos,
       creatorId: request.creator_id as string,
       createdAt: request.created_at as string,
+      extractedReceipt: (request.extracted_receipt as ExtractedReceipt) ?? null,
     };
   }
 

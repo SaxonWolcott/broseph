@@ -1,7 +1,11 @@
+import type { ExtractedReceipt } from '../payments.dto';
+
 export interface CreatePaymentRequestJobDto {
   groupId: string;
   creatorId: string;
   title: string;
+  note?: string;
+  extractedReceipt?: ExtractedReceipt;
   mode: 'per_item' | 'per_person' | 'direct';
   recipientId?: string;
   items: {
